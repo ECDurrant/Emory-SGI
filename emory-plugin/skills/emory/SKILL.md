@@ -89,6 +89,21 @@ Emory setup —
 - Only surface this checklist on first run or on a failed probe — don't reprint it
   every case.
 
+### Knowledge base (SharePoint) — the same brain as the cloud Emory agent
+
+The Copilot Studio "Emory - SGI Enterprise Support Agent" is grounded on the SharePoint
+site **`RatesTeamBAs`** — `safeguardproducts.sharepoint.com/sites/RatesTeamBAs/Shared Documents/`
+with 9 subfolders (each a Copilot **SharePoint** knowledge source, verified 2026-08-05):
+`Tools · SGI Portals (Phoenix Davinci) · SGI · SG DB Dictionaries + Core Table Details ·
+OEM Eligibility Matrix · OEMs · General · File Feeds Ingestion - SOP and Docs · Documentation`.
+
+**Read the same docs directly via the MS365 connection — no separate MCP:**
+- `sharepoint_search(query=…)` finds KB docs (returns `webUrl` + a `uri`), then
+  `read_resource(uri)` pulls full content.
+- Use it for **definitions and procedure**, not live facts: table/column meanings
+  (`SG DB Dictionary Edited.xlsx`), OEM eligibility rules, program runbooks — to ground a
+  verdict or explain a field. Live DB checks remain the source of truth for current config.
+
 ---
 
 ## Step -1 — Case intake from the browser (when the case is "the one on screen")
@@ -116,6 +131,50 @@ view **"IT Client Support · SR – API – All Open"** (the queue of open API-s
 Unless the analyst names a specific SR, **target this queue every time** — "run Emory,"
 "next one," "work the queue" ⇒ pull the next open SR; don't ask which case. If a tab is
 already on the queue, reuse it rather than reopening.
+
+### Keep the Salesforce session warm (in-app browser)
+
+This analyst's Salesforce times out (idle) and gets bounced to the SAML logout
+(`/services/auth/sp/saml2/logout` ⇒ the org is **SSO-federated**). To stop Emory losing
+the session mid-queue, **inject a self-running keep-alive into the Salesforce tab** the
+moment Emory is on a Salesforce origin — the timer runs inside the page's own event loop,
+so it keeps pinging autonomously after the turn ends, for as long as the tab stays open.
+
+**When to (re)inject:** right after the first `navigate` to Salesforce, and again after
+**every** subsequent `mcp__Claude_Browser__navigate` (a full navigation resets page JS and
+kills the timer). Clicking within Lightning (SPA) does *not* reset it. The snippet is
+idempotent (guards against double-install), so re-running it is always safe.
+
+Inject with `mcp__Claude_Browser__javascript_tool` (this is a runtime keep-alive on a
+site we don't own — legitimate, not a source/UI edit):
+```js
+(function(){
+  if (window.__emoryKeepAlive) return 'keep-alive already running';
+  var MIN = 10;  // ping interval; keep below the org idle timeout (Setup → Session Settings)
+  window.__emoryKeepAlive = setInterval(function(){
+    fetch(location.origin + '/services/data/?_ka=' + Date.now(),
+      { credentials:'include', cache:'no-store', redirect:'manual' })
+      .then(function(r){
+        if (r.type === 'opaqueredirect' || r.status === 0)
+          console.warn('[Emory keep-alive] SESSION GONE — redirected to login/logout (likely IdP/SSO expiry).');
+        else console.log('[Emory keep-alive] ping ok', r.status, new Date().toLocaleTimeString());
+      })
+      .catch(function(e){ console.warn('[Emory keep-alive] ping failed', e); });
+  }, MIN*60*1000);
+  return 'keep-alive installed: pinging /services/data/ every ' + MIN + ' min';
+})();
+```
+
+- **What it can and can't do.** It resets Salesforce's **idle** timeout, so inactivity no
+  longer logs you out. It **cannot** defeat an **IdP-side hard/absolute session lifetime**
+  (SSO "re-authenticate every N hours regardless of activity"). If the console logs
+  `SESSION GONE` despite the pings, that's the IdP expiring — Emory should **pause and let
+  the analyst re-log in** (never enter credentials), exactly as in the login-pause rule above.
+- **Don't over-engineer it.** One injection per Salesforce tab per navigation. Don't spawn
+  a `/loop` or a scheduled task just to keep the session warm — the in-page timer already
+  runs on its own; a polling loop would only burn turns to do what the page is already doing.
+- A standalone Tampermonkey copy of this (for the analyst's *real* Chrome, if they ever work
+  the queue there instead) lives at `C:\Users\edurrant\Downloads\sf-session-keepalive.user.js`.
 
 1. **Read the tab from the in-app Claude Browser** (`mcp__Claude_Browser__*`) — this
    analyst keeps Salesforce **logged in there**, so it is the working surface (confirmed
@@ -167,9 +226,22 @@ Always prefer it when available.
   **work from the SR body** (dealer code + VIN + symptom is usually enough to route) and
   **state "no payload attached"** in the verdict so the reader knows the odometer/
   in-service/returned-products weren't available.
-- When an attachment IS present but won't open in the in-app browser (Lightning renders
-  Files in shadowed components), ask the analyst to drop it in `Downloads\` and read it
-  there — human downloads, Emory reads.
+- **Open the attachment in-browser — this is the default, do it automatically.** The
+  payload lives in the SR's **Files** panel, and it *does* open on screen (confirmed
+  2026-08-05 on SR00397368). The flow:
+  1. On the SR record, **scroll down** to the **Files** tab / **Notes & Attachments**
+     related list (`mcp__Claude_Browser__computer` scroll, or `find` "Files").
+  2. **Click the file title** (e.g. `…_provider_combined.txt`) — it opens a **preview
+     modal**.
+  3. **Read it on screen with a `screenshot`** — the request/response XML renders legibly
+     even though `get_page_text` returns the record page, not the preview. Zoom/scroll the
+     modal for long payloads. (Reading the preview visually is fine — no download needed.)
+  4. Parse the same fields as any payload (dealer, VIN, saleDate, odometer, condition,
+     `vendorName`, and the **products actually returned**). **Never echo the plaintext
+     `<password>`** in `requestBase` — mask it and flag creds-in-the-clear to Middleware.
+  - Only fall back to "analyst drops it in `Downloads\`" if the preview genuinely won't
+    render. Don't skip the attachment just because `get_page_text` didn't capture it —
+    take the screenshot.
 - **Large files:** these payloads run 300 KB+. Don't full-read — `Grep` for the signal:
   `<productCode>`, `<planName>`, `<maxTerm>`, `<termMileage>`, `<vehicleClass>`,
   `<dealer>`, `<vin>`, `<responseStatus>`/`<errorMessage>`.
@@ -179,6 +251,10 @@ Always prefer it when available.
 - **What to pull from it:**
   - Request block → the exact `{code}`, `{vin}`, `saleDate` (= `{as_of}`), `odometer`,
     `vehicleCondition`, `channel`, `vendorName`.
+    - **When the payload names `sellerId`, that IS the rooftop — use it; never infer the code
+      from the dealer name.** One name can map to several rooftop codes (e.g. "Sewickley Porsche"
+      → both `PORS1131` and `PORS1133`, which carry different products). Guessing the rooftop from
+      the name produced a wrong verdict on SR00397732 — get the payload's `sellerId` first.
   - Response block → the **classes and terms actually returned**. If the complaint is
     "missing the X term," confirm whether that band is in the response at all, and what
     `vehicleClass` the returned plans carry. A capped class (e.g. **G9** tops out ~84mo/
@@ -450,6 +526,15 @@ WHERE program_id = {program_id}
 - Rate tables are **per-carrier** (no universal table); use `EMORY.V_RATE_SKU_ALL`.
 - Absence of an eligibility/exclusion row generally means **eligible**, not a failure.
 - PII lives in `STAGING.CMS.SG_CON_M1` / contracts — mask in summaries; access only when needed.
+- **Porsche CPO VSC (`POCP` "Porsche Premier Unlimited", prog 20265) — check `dbo.PBL_CPO` FIRST.**
+  For any "no CPO options / CPO VSC won't rate" Porsche case, the gate is a **Porsche-Approved
+  certification row in `dbo.PBL_CPO` for the VIN**. The request's `vehicleCondition=CPO` and the
+  retail feed `dbo.VEHICLE_RETAIL_DETAILS.SALETYPE='CPO'` **do NOT** satisfy POCP — the rating
+  engine keys off `PBL_CPO` (confirmed 2026-08-05, SR00397732). **Empty `PBL_CPO` = the answer:**
+  the car rates only standard VSC (`POVS`, in-warranty/`POVSPLIW` if inside the 4yr/50k warranty)
+  and POCP is suppressed. Owner = OEM Program / Porsche PCNA (certify the VIN). SGI config is clean.
+  (The Audi/VW-only limit is just the *`VCI_CPO`* feed — Porsche has its own `PBL_CPO`.) See memory
+  `porsche-pocp-cpo-pcna`.
 
 ## Verdict format
 1. **Path** — EAS or Legacy, and why (Step 0 result).
@@ -513,24 +598,100 @@ The point of Emory is to hand the analyst something they can post, not make them
 rewrite it. After the verdict, produce a **Teams-ready draft** — tight, skimmable,
 and safe to drop into the channel:
 
+**Write it in Emory's own voice — like a teammate dropping her findings in the channel,
+not a data dump** (see memory `emory-teams-card-voice`). **Always name the three things the
+team is actually looking for — Dealer, Product, and the Issue — up front:**
 ```
-🔎 Emory pre-analysis — {SR#} · {Product} on {Year Make Model} · Dealer {code}
-Verdict: {✅ PASS | ❌ FAIL | ⚠ NEEDS-HUMAN}   (platform: {EAS|Legacy}, data {live|~nightly})
+🔎 Emory · pre-analysis — {platform}     {✅ PASS | ⚠ NEEDS-HUMAN | ❌ FAIL}
 
-• Dealer {active/authorized}  • Product {assigned}  • Forms {ok}
-• Rates {system + SKUs / API-computed}  • Vehicle {eligible? class / gap}
+Hey team — I took a first pass at {SR#} before anyone picks it up.
 
-Bottom line: {one plain sentence}.
-{Owner + the one action, if not PASS. If NEEDS-HUMAN: the exact question to confirm.}
+Dealer:  {Dealer name} ({code})
+Product: {product code} — {product name}
+Issue:   {the symptom — what they're seeing}
+Vehicle: {Year Make Model} · VIN {vin}
+
+Here's what I checked:
+✅ Dealer active · ✅ VIN decodes · ✅ Rates present
+❌ {the failed check, in plain words}
+
+My read: {one plain sentence — what's wrong and why the rest still works}.
+I'd route it to: {owner}
+Can someone confirm: {the exact question — only if NEEDS-HUMAN}
+
+Read-only first pass — worth a human confirm before we act. — Emory
 ```
 
-- **Posting is a send — it needs the analyst's OK.** If a Teams connector is wired,
-  show the draft and ask "post to {channel}?" before sending; never auto-post. If no
-  connector, just print the draft for the analyst to paste.
+**Posting it (the wiring).** After the verdict, offer to post it to `#api-support-intake`.
+On the analyst's OK, POST it (via `curl`, Bash) to the **HTTP delivery flow** — the Power
+Automate flow **"Http -> Post message in a chat or channel"** (manual HTTP trigger → Teams
+**"Post message in a chat or channel"**, posting as **Flow bot** to the **#api-support-intake**
+group chat). The contract is a **single field**: `{ "message": "<html>" }`. The flow binds
+that straight into the Teams message (`triggerBody()?['message']`, wrapped in a `<p>`), so
+the message body **is HTML** — build the voice draft above and convert it for Teams:
+newlines → `<br>`, the `Dealer:/Product:/Issue:` labels → `<b>…</b>`, `&` → `&amp;`. Lead
+line stays `🔎 <b>Emory · pre-analysis</b> — {platform} · <b>{VERDICT}</b>` and it still
+signs `— Emory` at the end, so it reads as her even though Flow bot is the poster.
+
+Its POST URL (the `…&sig=…` trigger URL) lives in `Downloads\emory_verdict_delivery_url.txt`
+— **read it at post-time; never hardcode it in this skill or the shared package** (it's a
+secret).
+
+**Delivery is HANDS-OFF (opted in 2026-08-05).** At the end of every case, write the verdict
+JSON and call the bundled poster with **`-Auto`** — it posts automatically **only while the
+toggle `Downloads\emory_autopost.txt` reads `on`**, so hands-off is deliberate and revocable,
+not silent. This is the default end-of-run step now — don't stop to ask "post?" while the
+toggle is on. Guardrails still hold: it only ever posts Emory's own read-only pre-analysis
+card, never a dealer's PII or a plaintext password.
+
+**The bundled poster `emory_post.ps1`** (in this skill's folder) takes the verdict JSON Emory
+already emits (rich schema: `sr, dealer, product, issue, sub, platform, verdict, verdict_color,
+checks_md, bottom, owner, confirm`), builds the HTML `message` in her voice, and delivers:
+
+```bash
+# hands-off end-of-case step (posts iff emory_autopost.txt = on; previews otherwise):
+powershell -ExecutionPolicy Bypass -File ~/.claude/skills/emory/emory_post.ps1 -VerdictJson verdict.json -Auto
+# force a send regardless of the toggle:
+powershell -ExecutionPolicy Bypass -File ~/.claude/skills/emory/emory_post.ps1 -VerdictJson verdict.json -Post
+# preview only, never sends:
+powershell -ExecutionPolicy Bypass -File ~/.claude/skills/emory/emory_post.ps1 -VerdictJson verdict.json
+```
+
+**Pause hands-off** any time: write `off` to `Downloads\emory_autopost.txt` (then `-Auto`
+just previews). `-UrlFile`/`-AutoFile` default to the `Downloads\` files; point them at your
+own on other installs (both are local, kept OUT of the shared package). Or POST by hand:
+
+```bash
+curl -sS -X POST "$(grep -o 'https://[^ ]*' Downloads/emory_verdict_delivery_url.txt)" \
+  -H "Content-Type: application/json" --data '{"message":"<html…>"}'
+```
+
+(Verified live 2026-08-05: `{"message": …}` for the SQ8 verdict → run **Succeeded**, both
+steps green, message posted as Flow bot to #api-support-intake. The earlier failures were an
+**empty** message field — the flow needs the `message` field populated or "Post message"
+fails in ~180 ms.)
+
+- **Posting is a send, but the analyst has opted into hands-off** (`emory_autopost.txt = on`),
+  so `-Auto` delivers without a per-case prompt. The standing authorization covers **only
+  Emory's own pre-analysis card to #api-support-intake** — nothing else. If the toggle is
+  `off`, fall back to preview + explicit OK. Any *other* send (email, DM, a different channel)
+  still needs a fresh OK.
 - Keep it to what a teammate skimming the channel needs: verdict, one-line why, the
   single next action. The full check-by-check reasoning stays above it for anyone who
   clicks in.
-- Never put a dealer's PII or a plaintext password from a payload into the draft.
+- Never put a dealer's PII or a plaintext password from a payload into the card. This holds
+  even in hands-off mode — the guardrail is what makes auto-post safe.
+
+## Capturing learnings to the SOP (keep the brain current)
+
+The north star: every case solved by hand gets harvested so Emory gets smarter. Make that
+one sentence:
+- **"add this to the SOP: {learning}"** → append a dated entry to the **top** of
+  `Downloads\Emory_SOP_Addenda.md` (the living change log). Keep it concrete: the case, the
+  root cause, the exact query/rule, the owner. Also save a `memory` when it's durable.
+- **"merge the SOP addenda"** → fold settled addenda entries into the right section of
+  `Downloads\Emory_Base_Brain_Master_SOP.md`, then trim the log.
+- After finishing a real case whose root cause is new, **offer** to capture it — don't force it.
 
 ## Rules
 - **Read-only, always.** Every connector runs `SELECT` only — never write. Recommend a
