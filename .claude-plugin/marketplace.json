@@ -1,0 +1,19 @@
+{
+  "name": "safe-guard",
+  "owner": {
+    "name": "Safe-Guard Products International"
+  },
+  "metadata": {
+    "description": "Safe-Guard internal Claude plugins.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "emory",
+      "source": "./emory-plugin",
+      "description": "API-support triage agent — routes a case (paste/attach/Salesforce/email) EAS vs Legacy, runs five read-only config checks against live data, and returns a routable verdict + a paste-ready SR summary. Never concludes 'the API is broken' until every config check passes.",
+      "author": "Eric Durrant",
+      "keywords": ["api-support", "triage", "rating", "classing", "dealer", "salesforce"]
+    }
+  ]
+}
