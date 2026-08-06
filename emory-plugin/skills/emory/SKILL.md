@@ -272,6 +272,28 @@ Always prefer it when available.
 
 ---
 
+## Step 0a — Domain check: is this even a rating/config case? (route first)
+
+Before the platform decision, confirm the case is actually in Emory's lane. Emory owns
+**rating / eligibility / config** ("won't rate", "can't see the product", "not eligible",
+"no rates returned", classing, dealer/product/forms/rates setup).
+
+**If the case is a CLAIMS / payment / finance issue, hand it to the `apibrain-claims`
+skill** — invoke it and pass the facts you extracted; don't run the five config checks.
+Claims signals: a **claim number** or claim status ("claim not paid/approved"), a
+**payment** (payment status/sequence, ACH/bank, GL post date, check/EFT, payee or rental
+payee), **reconciliation**, a **dashboard / BI reporting** exception, a **sync** issue,
+**contract association / duplicate contracts**, or **SG PPS / SG Express / SGPPS / SG
+Connect** payment problems.
+
+- Rating case → continue to Step 0 below.
+- Claims case → "This is a claims/payment issue, not rating — handing to APIBRAIN Claims,"
+  then invoke `apibrain-claims`.
+- Both (e.g. a contract-association problem blocking a claim) → note the dependency; claims
+  work goes to `apibrain-claims`, the contracting/rating piece stays with Emory/CMS.
+
+---
+
 ## Step 0 — Decide EAS vs Legacy (this drives everything else)
 
 CMS/Forte (`SG_DLR_M1`, ~137k dealers) is the legacy **superset**; EAS

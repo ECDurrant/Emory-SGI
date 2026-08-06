@@ -14,6 +14,13 @@
       "description": "API-support triage agent — routes a case (paste/attach/Salesforce/email) EAS vs Legacy, runs five read-only config checks against live data, and returns a routable verdict + a paste-ready SR summary. Never concludes 'the API is broken' until every config check passes.",
       "author": "Eric Durrant",
       "keywords": ["api-support", "triage", "rating", "classing", "dealer", "salesforce"]
+    },
+    {
+      "name": "apibrain-claims",
+      "source": "./apibrain-claims-plugin",
+      "description": "Claims-resolution analyst — the claims/payments/finance sibling to Emory. Classifies a claim, payment, mapping, reconciliation, sync, or SG PPS/Express/Connect case, grounds it in the claims KB (SOP/BRD/RCA), names the owning team, and drafts a customer update + paste-ready SR summary. Read-only; routes rating/classing cases to Emory.",
+      "author": "Eric Durrant",
+      "keywords": ["claims", "payments", "finance", "reconciliation", "mapping", "sg-pps", "api-support"]
     }
   ]
 }

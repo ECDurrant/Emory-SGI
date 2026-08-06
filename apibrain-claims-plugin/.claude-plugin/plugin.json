@@ -1,0 +1,10 @@
+{
+  "name": "apibrain-claims",
+  "version": "0.1.0",
+  "description": "Safe-Guard claims-resolution analyst. Point it at a claims, payment, or finance case (claim status, payment sequence, GL post date, ACH/payee, OEM/dealer mapping, reconciliation, BI exception, sync, contract association, SG PPS/Express/Connect) and it extracts the facts, classifies the issue, names the owning team, cites SOP/BRD/RCA evidence, and drafts a customer update plus a paste-ready SR Summary. Read-only; routes rating/eligibility/classing cases to Emory.",
+  "author": {
+    "name": "Eric Durrant — Safe-Guard Products International"
+  },
+  "keywords": ["safe-guard", "claims", "payments", "finance", "reconciliation", "mapping", "sg-pps", "api-support"],
+  "license": "UNLICENSED"
+}
