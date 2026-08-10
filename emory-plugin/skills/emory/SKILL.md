@@ -306,17 +306,44 @@ RR∩Legacy **40,373**, RR-only just **291**. Legacy/Forte is the superset backs
 | **Legacy / Forte** — superset | `STAGING.CMS.*` | Postgres (Tier 3) | `SG_DLR_M1.SG_DLR_DEALER` |
 | **RoadRunner (RR)** — GM + e-com | `STAGING.RR.*` (+ `RR_UTILITY`, `RR_DEALER_CONFIGURATION`) | — Snowflake only | `RR.DEALER.DEALER_CODE` |
 
-**Three-way presence probe (one Snowflake hop):**
+**Dealer profile — one-hop preload (run this FIRST).** One Snowflake query returns platform
+presence + OEM + IDs + status + active programs across all three platforms, so the five checks
+**reuse it instead of re-querying** (replaces the old presence probe + the separate per-platform
+anchor lookups):
 ```sql
--- Tier 1 (Snowflake)
-SELECT
-  (SELECT COUNT(*) FROM STAGING.EAS.V_DEALER  WHERE CMS_DEALER_NUMBER = '{code}') AS in_eas,
-  (SELECT COUNT(*) FROM STAGING.CMS.SG_DLR_M1 WHERE SG_DLR_DEALER      = '{code}') AS in_legacy,
-  (SELECT COUNT(*) FROM STAGING.RR.DEALER     WHERE DEALER_CODE        = '{code}') AS in_roadrunner;
+-- Tier 1 (Snowflake). in_eas = EAS product assignments; in_legacy/in_rr = dealer presence.
+WITH p AS (SELECT '{code}' AS code),
+eas AS (SELECT COUNT(*) n, ANY_VALUE(DEALER_ID) dealer_id, LISTAGG(DISTINCT PROGRAM_NAME,', ') programs
+        FROM STAGING.EAS.DEALER_PRODUCT_VW WHERE CMS_DEALER_NUMBER=(SELECT code FROM p)),
+lgy AS (SELECT COUNT(*) n, ANY_VALUE(SG_DLR_COMPANY) company, ANY_VALUE(SG_DLR_PLC) plc,
+               ANY_VALUE(SG_DLR_CARRIER) carrier,
+               ANY_VALUE(CASE WHEN SG_DLR_OUTOFBUS<>'1799-12-31' AND SG_DLR_OUTOFBUS<=CURRENT_DATE THEN 'OOB'
+                              WHEN SG_DLR_EDATE<>'1799-12-31'   AND SG_DLR_EDATE  <=CURRENT_DATE THEN 'END_DATED'
+                              ELSE 'ACTIVE' END) status
+        FROM STAGING.CMS.SG_DLR_M1 WHERE SG_DLR_DEALER=(SELECT code FROM p)),
+rr  AS (SELECT COUNT(DISTINCT d.DEALER_ID) n, ANY_VALUE(d.DEALER_NAME) name, ANY_VALUE(d.DEALER_STATE) st,
+               ANY_VALUE(d.OUT_OF_BUSINESS_DATE) oob, LISTAGG(DISTINCT pg.PROGRAM_NAME,', ') programs
+        FROM STAGING.RR.DEALER d
+        LEFT JOIN STAGING.RR.DEALER_PRODUCT dp ON dp.DEALER_ID=d.DEALER_ID
+        LEFT JOIN STAGING.RR.PROGRAM pg        ON pg.PROGRAM_ID=dp.PROGRAM_ID
+        WHERE d.DEALER_CODE=(SELECT code FROM p))
+SELECT (SELECT code FROM p) AS code,
+       COALESCE(eas.n,0) AS in_eas, COALESCE(lgy.n,0) AS in_legacy, COALESCE(rr.n,0) AS in_rr,
+       eas.dealer_id AS eas_dealer_id, eas.programs AS eas_programs,
+       lgy.company, lgy.status AS legacy_status, lgy.plc AS legacy_plc, lgy.carrier AS legacy_carrier,
+       rr.name AS rr_name, rr.st AS rr_state, rr.programs AS rr_programs
+FROM eas, lgy, rr;
 ```
-- All zero → resolve by name/phone; still nothing → **NEEDS-HUMAN** (unknown dealer).
-- Multiple hits (the norm) → don't pick by presence; use the **prefix bias** below to pick
-  where to look **first**, then confirm the product/program is actually configured there.
+- **Carry the profile forward — don't re-look-up:** `eas_dealer_id` + `eas_programs` seed the EAS
+  checks; `legacy_plc`/`legacy_carrier`/`legacy_status` seed the Legacy checks (→ `SG_DRS_M1`);
+  `rr_*` seed the RR checks. This is the efficiency win — one query instead of four.
+- All three zero → resolve by name/phone; still nothing → **NEEDS-HUMAN** (unknown dealer).
+- Multiple hits are **normal** (codes are multi-written). Pick where to look **first** via the
+  **prefix bias** below × presence, then confirm the product/program is configured there.
+- **Status nuance:** a Legacy `OOB`/`END_DATED` does **not** mean inactive if the dealer is live on
+  EAS or RR — judge status on the platform that services the case (verified 2026-08: `AU422A33` is
+  `OOB` in Legacy yet active in EAS). Freshness: `in_eas` comes from the nightly `DEALER_PRODUCT_VW`;
+  if the case says "just set up," re-check Tier 2.
 
 **Dealer-code prefix → OEM + first-search bias** (validated against live counts 2026-08;
 a *bias* to confirm, never proof — always verify the product in the chosen platform):
