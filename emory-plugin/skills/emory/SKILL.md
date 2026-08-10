@@ -334,9 +334,8 @@ a *bias* to confirm, never proof — always verify the product in the chosen pla
 > these, check **RR config** — `RR.DEALER_PRODUCT`, `RR.PROGRAM`/`RR.PRODUCT`, `RR.CLASS`,
 > `RR.FORM_PRODUCT_STATE`, `RR.PRODUCT_SKU_PRICING_OPTION` — for the modern config, not just
 > Forte. RoadRunner is reachable **now via the existing Snowflake connection** (no new
-> connector). Full RR-specific five-check queries are still being built; until then, confirm
-> config presence in `STAGING.RR.*` and mark RR-specific rate/classing detail NEEDS-HUMAN if
-> unclear.
+> connector). RR-specific five checks — including VIN→class — are wired below under
+> **"RoadRunner (RR) checks."**
 
 ---
 
@@ -613,10 +612,35 @@ WHERE PROGRAM_ID = {program_id} AND PRODUCT_ID = {product_id}
 LIMIT 50;
 ```
 
-**Check 6 — classing:** `STAGING.RR.CLASS` (`CLASS_ID`, `PROGRAM_ID`, `CLASS_NAME`,
-`CLASS_DESCRIPTION`) lists the program's classes; the rate SKU's `CLASS` text ties the vehicle
-to pricing. Full VIN→class resolution for RR is still TBD — until confirmed, read the class from
-the returned rate rows / API payload and mark a genuine gap **NEEDS-HUMAN**.
+**Check 6 — classing (VIN → class, fully resolvable in Snowflake — RR's dictionaries ARE
+replicated, unlike EAS).** Two methods; pick by the vocabulary the program's `RATE_SKU_*.CLASS`
+uses:
+
+- **VSC / CPO programs → name-based** `RR_UTILITY.VIN_VASUR_CLASS_CODE`: match the 10-char
+  squished pattern → `VSC_CLASS1/2` (or `CPO_CLASS1/2` for CPO). Name-based (`VIN_PATTERN`,
+  `MAKE`, `MODEL` text; `START_DATE`/`END_DATE`, `STATUS`) — no id normalization needed.
+- **GM / OEM make-tier programs → id-based chain** (class differs **per product** — always
+  filter `PRODUCT_ID`):
+```sql
+-- VIN -> VIN_DETAIL -> PRODUCT_CLASS -> CLASS.CLASS_NAME (= the RATE_SKU_* CLASS text)
+WITH v AS (
+  SELECT MODEL_ID, MODEL_YEAR, DRIVE_TYPE, FUEL_TYPE, ENGINE_SIZE
+  FROM STAGING.RR_UTILITY.VIN_DETAIL
+  WHERE VIN_PATTERN = LEFT('{vin}',8) || SUBSTR('{vin}',10,2)
+)
+SELECT DISTINCT c.CLASS_NAME
+FROM v
+JOIN STAGING.RR_UTILITY.PRODUCT_CLASS pc
+  ON pc.MODEL_ID = v.MODEL_ID AND pc.PROGRAM_ID = {program_id} AND pc.PRODUCT_ID = {product_id}
+ AND {year} BETWEEN pc.MODEL_YEAR_START AND pc.MODEL_YEAR_END
+JOIN STAGING.RR_UTILITY.CLASS c ON c.CLASS_ID = pc.CLASS_ID;
+```
+  The `CLASS_NAME` feeds Check 5's `RATE_SKU_*.CLASS` filter. One class → PASS; several after the
+  `PRODUCT_ID` filter → narrow by `DRIVE_TYPE`/`FUEL_TYPE`/`ENGINE_SIZE`/`MODEL_TRIM_ID`; zero →
+  NEEDS-HUMAN (nomenclature vs. genuine gap). `CLASS.CLASS_NAME` = the rate vocabulary
+  (e.g. `BUIC1`); `PRODUCT_CLASS.EXTERNAL_CLASS` is a separate OEM code — join on `CLASS_ID`, not
+  `EXTERNAL_CLASS`. Verified 2026-08: 2024 Buick Envision (pattern `LRBFZSE4RD`, MODEL_ID 613,
+  program 9) → `BUIC1`.
 
 ---
 
