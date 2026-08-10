@@ -447,17 +447,22 @@ ORDER BY f.FORM_CODE;
 ```sql
 SELECT rsa.RATE_SYSTEM_ID, rs.NAME AS rate_system_name, rsa.PROGRAM_ID,
        rs.PRODUCT_CODE_ID, rsa.DEALER_ID, rsa.AGENT_ID,
-       rsa.SALES_EFFECTIVE_DATE, rsa.SALES_EXPIRATION_DATE,
+       rsa.SALES_EFFECTIVE_DATE, rsa.SALES_EXPIRATION_DATE,   -- informational only; DO NOT gate on these
        rs.IS_TIERED, rs.RATE_TIER, rs.IS_DEFAULT
 FROM STAGING.EAS.RATE_SYSTEM_APPLICATION rsa
 JOIN STAGING.EAS.RATE_SYSTEM rs ON rs.RATE_SYSTEM_ID = rsa.RATE_SYSTEM_ID
 WHERE (rsa.DEALER_ID = {dealer_id} OR rsa.DEALER_ID IS NULL)   -- assignment can be dealer-, agent-, or program-level
   AND rsa.PROGRAM_ID = {program_id}
-  AND rs.PRODUCT_CODE_ID = {product_code_id}                    -- product scope is on RATE_SYSTEM, NOT the application
-  AND '{as_of}' BETWEEN rsa.SALES_EFFECTIVE_DATE AND rsa.SALES_EXPIRATION_DATE;
+  AND rs.PRODUCT_CODE_ID = {product_code_id};                  -- product scope is on RATE_SYSTEM, NOT the application
 ```
-No row = **Rate System Missing (RC#4)** → Rates & Forms. (Some carriers, e.g. MOPAR,
-assign at `AGENT_ID` level — widen the filter before concluding a gap.)
+> **⚠ Do NOT gate 5a on `SALES_EFFECTIVE/EXPIRATION_DATE`.** Verified 2026-08: **~35% of
+> `RATE_SYSTEM_APPLICATION` rows carry stale windows** (2016 migration stubs / single-day dates)
+> even when the dealer rates fine today — e.g. `AU422A33`/AUVS had rate system 134 but a
+> 2016-12-12→22 window, while 211k SKUs were currently active. Filtering on the application date
+> gives a **false "Rate System Missing."** The **row's existence** is the 5a signal; the
+> **active-date truth is Check 5b** (the `RATE_SKU_*` sale window).
+No row at all = **Rate System Missing (RC#4)** → Rates & Forms. (Some carriers, e.g. MOPAR,
+assign at `AGENT_ID` level — widen the filter with the dealer's agent before concluding a gap.)
 
 **5b. Rate SKU rows exist?** — use `STAGING.EMORY.V_RATE_SKU_ALL` (the union of the
 replicated carrier tables; see `EMORY_SNOWFLAKE_LAYER.sql`). Until that view is
