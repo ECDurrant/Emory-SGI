@@ -406,8 +406,13 @@ WHERE dpc.DEALER_ID = {dealer_id} AND rpc.PRODUCT_CODE = '{product_code}'
 ```
 Zero rows on the window = **not authorized on that date** → flag (RC#1/#2, Acct Mgmt).
 
-**Legacy:** product/plan is the `SG_DLR_PLC` on `SG_DLR_M1` and the plan catalog
-`STAGING.CMS.SG_PLC_M1` (`SG_PLC_PLC` → `SG_PLC_DESC`); coverages in `SG_COV_M1`.
+**Legacy:** the dealer's real plan/rate-system **enrollments live in `STAGING.CMS.SG_DRS_M1`**
+(keyed **by dealer** — `SG_DRS_DEALER`, `SG_DRS_PLC`, `SG_DRS_RS`, `SG_DRS_SDATE/EDATE`), **not**
+the single `SG_DLR_PLC` on `SG_DLR_M1` (that's only a primary/default code — verified 2026-08:
+it repeats as `SAFE` across many dealers). Resolve Check 2 from `SG_DRS_M1` (active window:
+`SG_DRS_SDATE <= as_of AND (SG_DRS_EDATE = '1799-12-31' OR >= as_of)`); look up each plan in the
+catalog `STAGING.CMS.SG_PLC_M1` (`SG_PLC_PLC` → `SG_PLC_DESC`); coverages in `SG_COV_M1`.
+Verified `00SG1055` (Hinshaws Acura): 8 active `SG_DRS_M1` enrollments → 21 rate schedules.
 
 > **Pin the program.** A product code (e.g. `QPTR`) spans multiple programs with
 > different `PRODUCT_CODE_ID`s. Always filter `PROGRAM_ID` before product-scoped lookups.
@@ -489,9 +494,13 @@ LIMIT 50;
 > the config (rate system assigned, program live) and report
 > `RATE_SOURCE = API_COMPUTED` — never conclude "no rates" from an empty table.
 
-**Legacy rates:** schedule master `STAGING.CMS.SG_RSC_M1` (`SG_RSC_RS` = rate system,
-`SG_RSC_PLC`, `SG_RSC_CARRIER`, `SG_RSC_SDATE/EDATE`, `SG_RSC_METHOD`,
-`SG_RSC_BASERATE`), tiers `SG_RSC_D1/D2/D3`, dealer↔system `SG_DRS_M1`.
+**Legacy rates:** the dealer→rate-system link is `SG_DRS_M1` (`SG_DRS_DEALER` → `SG_DRS_RS`);
+join it to the schedule master `STAGING.CMS.SG_RSC_M1` on `SG_DRS_RS = SG_RSC_RS` (`SG_RSC_RS` =
+rate system, `SG_RSC_PLC`, `SG_RSC_CARRIER`, `SG_RSC_SDATE/EDATE`, `SG_RSC_METHOD`,
+`SG_RSC_BASERATE`), tiers `SG_RSC_D1/D2/D3`. Forms: `SG_FORM_M1` keyed by `SG_FORM_PLC` +
+`SG_FORM_CARRIER` (`SG_FORM_SDATE/EDATE`). Classing: `VSC_CLASS_M1` (`VSC_CLASS_CAR` = carrier,
+`VSC_CLASS_MAKE`/`_MODEL` token-matched, `VSC_CLASS_SYEAR/EYEAR`, `VSC_CLASS_CLASS`,
+`VSC_CLASS_RGROUP`). Verified live 2026-08 (`00SG1055`): all resolve.
 
 ### Check 6 — Vehicle classing / eligibility
 
