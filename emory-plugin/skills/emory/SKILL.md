@@ -291,27 +291,52 @@ Connect** payment problems.
 
 ---
 
-## Step 0 — Decide EAS vs Legacy (this drives everything else)
+## Step 0 — Which platform services this case? (this drives everything else)
 
-CMS/Forte (`SG_DLR_M1`, ~137k dealers) is the legacy **superset**; EAS
-(`V_DEALER`, ~60k) is the modern-platform subset; ~45k codes live in **both**.
-Codes are program-prefixed (`HYUFL127`, `KMVA062`, `MOP60876`). Resolve the path:
+SGI runs **three** dealer/config platforms, and **the same dealer code is written to
+more than one of them** — so you cannot infer the platform from the code alone. Presence
+≠ the platform that services the case; the **program/product** decides. Sizes + overlap
+(prod replica, verified 2026-08): EAS `V_DEALER` **60,334** · Legacy `SG_DLR_M1`
+**137,037** · RoadRunner `RR.DEALER` **55,277**; EAS∩Legacy **45,682**, RR∩EAS **39,396**,
+RR∩Legacy **40,373**, RR-only just **291**. Legacy/Forte is the superset backstop.
 
+| Platform | Where (Snowflake, Tier 1) | Live fallback | Dealer master |
+|---|---|---|---|
+| **EAS** — modern VCI / luxury / HPP | `STAGING.EAS.*` | SQL Server (Tier 2) | `V_DEALER.CMS_DEALER_NUMBER` |
+| **Legacy / Forte** — superset | `STAGING.CMS.*` | Postgres (Tier 3) | `SG_DLR_M1.SG_DLR_DEALER` |
+| **RoadRunner (RR)** — GM + e-com | `STAGING.RR.*` (+ `RR_UTILITY`, `RR_DEALER_CONFIGURATION`) | — Snowflake only | `RR.DEALER.DEALER_CODE` |
+
+**Three-way presence probe (one Snowflake hop):**
 ```sql
--- Run against Snowflake (Tier 1)
+-- Tier 1 (Snowflake)
 SELECT
   (SELECT COUNT(*) FROM STAGING.EAS.V_DEALER  WHERE CMS_DEALER_NUMBER = '{code}') AS in_eas,
-  (SELECT COUNT(*) FROM STAGING.CMS.SG_DLR_M1 WHERE SG_DLR_DEALER      = '{code}') AS in_legacy;
+  (SELECT COUNT(*) FROM STAGING.CMS.SG_DLR_M1 WHERE SG_DLR_DEALER      = '{code}') AS in_legacy,
+  (SELECT COUNT(*) FROM STAGING.RR.DEALER     WHERE DEALER_CODE        = '{code}') AS in_roadrunner;
 ```
+- All zero → resolve by name/phone; still nothing → **NEEDS-HUMAN** (unknown dealer).
+- Multiple hits (the norm) → don't pick by presence; use the **prefix bias** below to pick
+  where to look **first**, then confirm the product/program is actually configured there.
 
-- `in_eas > 0`  → **EAS path** (modern platform). Config lives in `STAGING.EAS.*`.
-- `in_eas = 0 AND in_legacy > 0` → **Legacy path**. Config lives in `STAGING.CMS.*`.
-- both 0 → try resolving by name/phone; if still nothing → **NEEDS-HUMAN** (unknown dealer).
+**Dealer-code prefix → OEM + first-search bias** (validated against live counts 2026-08;
+a *bias* to confirm, never proof — always verify the product in the chosen platform):
 
-> **E-com exception:** some e-com programs (Kia `0KM*`, Hyundai HCI `HYU*`) are
-> **absent from `V_DEALER`** yet rate live via the API off the Forte side. So
-> "not in EAS" means "config lives in Forte", **not** "not on the API." Route
-> these down the Legacy path and note it.
+| Prefix(es) | OEM / channel | Look FIRST |
+|---|---|---|
+| `AU` `VW` `0MB`/`00MB` `PORS` `TOY` `CCC` `BENT` `LAMB` `AM` `JAG` `LRV` `LEX` `MAZ` `SU` `00HD` `G`(BMW) | VCI / luxury | **EAS** (dual with Legacy) |
+| `HPP` | Hyundai HPP | **EAS** |
+| `GMF` `CB` + many numeric codes | GM | **RoadRunner** |
+| `HYU` `0KM` `0GF` `HF` `0PP` | Hyundai / Kia / Genesis / Honda **e-com** | **RoadRunner** (then Forte); **not EAS** (~0 there) |
+| `00S` | SGI Agents | **Legacy** (also spread across EAS/RR) |
+
+> **Corrects the old "e-com → Forte" rule:** the Kia/Hyundai/Genesis/Honda e-com dealers
+> are **absent from EAS but present in RoadRunner** (`STAGING.RR`) as well as Legacy. For
+> these, check **RR config** — `RR.DEALER_PRODUCT`, `RR.PROGRAM`/`RR.PRODUCT`, `RR.CLASS`,
+> `RR.FORM_PRODUCT_STATE`, `RR.PRODUCT_SKU_PRICING_OPTION` — for the modern config, not just
+> Forte. RoadRunner is reachable **now via the existing Snowflake connection** (no new
+> connector). Full RR-specific five-check queries are still being built; until then, confirm
+> config presence in `STAGING.RR.*` and mark RR-specific rate/classing detail NEEDS-HUMAN if
+> unclear.
 
 ---
 
