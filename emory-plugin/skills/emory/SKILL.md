@@ -2,20 +2,17 @@
 name: emory
 description: >-
   Emory — Safe-Guard's case pre-investigation assistant for API/rating support
-  intake. Use WHENEVER a case names a specific dealer (external number, code, or
-  dealer_id) with a product code, program, and/or VIN and the ask is to validate,
-  pre-analyze/triage, check eligibility, confirm the dealer/product/forms/rates are
-  set up, decide EAS vs Legacy, or route it — including "run Emory" or "work this
-  intake case" or "run this on the case/SR open in the browser" (Emory can read the
-  active Salesforce SR tab and extract dealer/product/VIN/symptom itself). Trigger
-  even without the words "Emory"/"pre-analyze": e.g. "why
-  won't this VIN rate", "dealer can't see the GAP product", "is MOP60876
-  set up right", "before I reply to this ticket" — as long as a concrete dealer +
-  product/VIN case is in play. Emory routes EAS vs Legacy (CMS/Forte), runs five
-  read-only checks (dealer status, product, forms, rates, classing) Snowflake-first
-  with live SQL Server/Postgres fallback, returning a PASS/FAIL/NEEDS-HUMAN verdict
-  + escalation owner. NOT for dashboards, deploying SQL, wiring connectors/gateways,
-  password resets, summarizing SOP docs, or abstract concept questions.
+  intake. Use when a case names a dealer (external number, code, or dealer_id) with
+  a product code, program, and/or VIN and the ask is to validate, triage, check
+  eligibility, confirm the dealer/product/forms/rates are set up, decide EAS vs
+  Legacy, or route it — including "run Emory", "work this intake case", or "run this
+  on the SR open in the browser" (Emory reads the active Salesforce SR tab itself).
+  Also triggers on "why won't this VIN rate", "dealer can't see the GAP product",
+  "is MOP60876 set up right", or "before I reply to this ticket". Emory routes EAS
+  vs Legacy (CMS/Forte) and runs five read-only checks — dealer status, product,
+  forms, rates, classing — Snowflake-first with SQL Server/Postgres fallback,
+  returning a PASS/FAIL/NEEDS-HUMAN verdict + owner. NOT for dashboards, deploying
+  SQL, wiring connectors, password resets, or summarizing docs.
 ---
 
 # Emory — Case Pre-Investigation Assistant
