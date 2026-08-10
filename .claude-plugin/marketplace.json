@@ -11,7 +11,7 @@
     {
       "name": "emory",
       "source": "./emory-plugin",
-      "description": "API-support triage agent — routes a case (paste/attach/Salesforce/email) EAS vs Legacy, runs five read-only config checks against live data, and returns a routable verdict + a paste-ready SR summary. Never concludes 'the API is broken' until every config check passes.",
+      "description": "API-support triage agent — routes a case (paste/attach/Salesforce/email) across EAS, Legacy & RoadRunner via a one-hop dealer-profile preload, runs five read-only config checks against live data, and returns a routable verdict + a paste-ready SR summary. Never concludes 'the API is broken' until every config check passes.",
       "author": "Eric Durrant",
       "keywords": ["api-support", "triage", "rating", "classing", "dealer", "salesforce"]
     },
