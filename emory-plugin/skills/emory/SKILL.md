@@ -366,6 +366,54 @@ a *bias* to confirm, never proof — always verify the product in the chosen pla
 
 ---
 
+## Step 0b — Duplicate & prior-work check (run right after the profile, before the five checks)
+
+Before investigating, check whether this VIN is **already contracted** or **already ticketed** — it
+prevents redundant work and catches a common real root cause (a duplicate-sale block). Surface the
+result as a **banner at the top of the verdict**. Classify, don't hard-block.
+
+**Probe 1 — existing contract on this VIN (Snowflake, all three platforms; VIN-indexed, cheap).**
+Non-PII columns only — **never** select customer name/address/phone from `SG_CON_M1`.
+```sql
+-- Tier 1 (Snowflake). {vin} = full 17-char VIN.
+WITH v AS (SELECT '{vin}' AS vin)
+SELECT 'Legacy' AS src, CAST(SG_CON_CONTRACT AS VARCHAR) AS contract, CAST(SG_CON_DEALER AS VARCHAR) AS dealer,
+       CAST(SG_CON_PLC AS VARCHAR) AS product, CAST(SG_CON_STATUS AS VARCHAR) AS status, CAST(SG_CON_SALEDATE AS VARCHAR) AS sale_date
+FROM STAGING.CMS.SG_CON_M1 c, v WHERE c.SG_CON_VIN = v.vin
+UNION ALL
+SELECT 'EAS', CAST(ECON_CONTRACT_NUMBER AS VARCHAR), CAST(DEALER_NUMBER AS VARCHAR),
+       CAST(PRODUCT_CODE AS VARCHAR), CAST(STATUS AS VARCHAR), CAST(CONTRACT_SALE_DATE AS VARCHAR)
+FROM STAGING.EAS.ECON_CONTRACT e, v WHERE e.VIN = v.vin
+UNION ALL
+SELECT 'RoadRunner', CAST(CONTRACT_NUMBER AS VARCHAR), CAST(DEALER_NUMBER AS VARCHAR),
+       CAST(PRODUCT_CODE AS VARCHAR), CAST(VEHICLE_CONDITION AS VARCHAR), CAST(SALE_DATE AS VARCHAR)
+FROM STAGING.RR_UTILITY.API_CONTRACT_SKU r, v WHERE r.VIN = v.vin;
+```
+Verified 2026-08-11: new-sale VIN → 0 rows (no dup); a contracted VIN → Legacy 3 / EAS 3 (dual-written).
+
+**Probe 2 — another Salesforce SR on this VIN.** The SR/Case object is **not in any DB** (checked
+2026-08-11: `SF_CLAIM`=claims, `SF_D2C`=orders; no Support_Request/Case anywhere). Query Salesforce via
+the **Power Automate "Emory · SR Dedup by VIN" flow** (build-spec: `Downloads\Emory_SR_Dedup_Flow_BuildSpec.md`)
+— POST `{ "vin": "{vin}" }` to its HTTP trigger (same pattern as the Teams poster); it returns matching SRs
+(number, status, created, subject). URL lives in `Downloads\emory_sr_dedup_url.txt` (read at call-time; never
+hardcode). If the flow isn't wired yet, fall back to the in-app browser global search for the VIN, scoped to
+**open + last ~180 days**, and say "SR-dedup via browser (flow not yet wired)".
+
+**Classify (surface at the top of the verdict):**
+| Found | Handling |
+|---|---|
+| Active contract, **same VIN + same product/coverage** | 🎯 Likely **duplicate-sale block** — can't sell/rate a 2nd contract on a VIN already covered. Name the contract#, route there; don't chase config. |
+| Contract, same VIN, **different product** | Context only (multiple products per vehicle is legit) — note & continue. |
+| **Cancelled/expired** contract, same VIN | Note (explains history) & continue. |
+| **Open SR**, same VIN | ⚠ **Duplicate ticket** — surface the other SR, recommend consolidate; don't double-work. |
+| **Resolved SR**, same VIN | Surface its **resolution** as the probable answer. |
+| Nothing | "No duplicate contract or prior SR on this VIN" — proceed; report as a clean signal. |
+
+- Match on the **full 17-char VIN** (contracts store it), not the squished classing pattern.
+- Read-only + **PII-masked**. Confidence: same VIN + same product = high (likely block); VIN-only = medium (dupe/context).
+
+---
+
 ## The five checks
 
 Parameters: `{code}`/`{dealer_id}`, `{product_code}`, `{program_id}`, `{vin}`,
