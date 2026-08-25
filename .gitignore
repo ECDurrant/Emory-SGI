@@ -1,0 +1,19 @@
+# Live credentials — never commit. Only secrets.example.json (placeholders) ships.
+secrets.json
+**/live_fire/secrets.json
+*.secrets.json
+
+# Local wrapper / MCP config, which carries per-machine paths and tokens
+wrapped_servers.json
+claude_desktop_config.json
+
+# Teams webhook / trigger URLs (emory_post.ps1 -UrlFile)
+*url.txt
+*webhook*.txt
+
+# Working files
+*.bak
+*.bak-*
+*.bak.*
+__pycache__/
+*.pyc

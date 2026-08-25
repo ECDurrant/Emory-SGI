@@ -1,0 +1,19 @@
+{
+  "_comment": "Canonical sample verdict used ONLY to regenerate emory_verdict_card.html. Kept as the INC1315934 RV GAP case so the reference card keeps demonstrating the orange NEEDS REVIEW styling. Exercises every optional field (title, source, reported, confirm). Regenerate with: powershell -File emory_post.ps1 -VerdictJson emory_verdict_card.sample.json -EmitTemplate",
+  "sr": "INC1315934",
+  "title": "Outlet Recreation-Fargo — RV GAP pricing lower than expected",
+  "dealer": "Outlet Recreation-Fargo (00S25531)",
+  "product": "RVGP — RV/Motorhome GAP",
+  "issue": "The dealer was quoted $170 for RV GAP coverage and expected roughly $220 to $250, based on what the comparable Marine product quotes and on a price they saw a few months ago.",
+  "sub": "2027 Ice Castle Fish House · VIN 5TJBE2111VM039232",
+  "source": "MenuMetric, via Provider Exchange Network (PEN) / F&I Express",
+  "reported": "Dealer via Account Management — 2026-08-23",
+  "platform": "EAS (SG Agents, program 20376)",
+  "verdict": "NEEDS REVIEW",
+  "verdict_color": "#f0883e",
+  "checks_md": "✅ **PASS** — Dealer status: active (EAS id 58473)\n✅ **PASS** — Products assigned: BTGP & RVGP authorized (2026-05-04 – 9999-12-31)\n✅ **PASS** — eContract forms: SGRGP1201115, 24-state coverage\n✅ **PASS** — Rate system: assigned (RVGP NATL id 4487)\n⚠️ **REVIEW** — Rate SKUs: API-computed, no stored pricing in the EAS tables\n✅ **PASS** — Vehicle eligibility: trailer eligible, products returned",
+  "bottom": "The $170 the dealer saw is the real, current price the pricing engine returns for RV GAP — not an error. RV GAP and the Marine GAP product are simply priced differently on purpose: Marine sits at $250, while RV runs $170 to $210 depending on the length of the contract. The roughly $220 the dealer remembers is an older price from several months ago; carrier pricing is refreshed periodically, and this looks like a normal refresh rather than anything broken.",
+  "confirm": "Rates & Forms should confirm that $170 is the intended current RV GAP price, so Account Management can tell the dealer with confidence that nothing is wrong. Because this product's price is calculated live rather than stored, we cannot verify it from our own records alone.",
+  "owner": "Rates & Forms (confirm current RVGP pricing); Account Management (dealer education)",
+  "classification": "**Integration Partner:** MenuMetric\n**Aggregator:** Provider Exchange Network (PEN) / F&I Express\n**Inquiry Type:** Pricing Query / Rate Verification\n**Inquiry Sub-Type:** Dealer Cost Discrepancy\n**SR Category:** Pricing - EAS"
+}
