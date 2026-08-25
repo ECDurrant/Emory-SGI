@@ -135,10 +135,32 @@ $parts += "<div style='margin-top: 10px;'><b>What we found:</b> " + (HtmlEsc $v.
 if ($v.owner) { $parts += "<div style='margin-top: 10px;'><b>Next action:</b> Escalate to " + (HtmlEsc $v.owner) + "</div>" }
 $parts += "</div></div>"
 
-# ===== KEY FINDINGS (checks, color-coded) =====
+# ===== KEY FINDINGS (checks, color-coded by verdict) =====
+# The findings block and the footer badge both take their colors from the verdict. This
+# matters more than it looks: these were previously pinned to green/orange regardless of
+# outcome, so a FAIL card rendered its findings in success-green — backwards from what
+# someone skimming the channel needs to see. `verdict_color` in the JSON overrides the
+# accent when an author wants to force one; otherwise it derives from the verdict.
+$verdict_accent = switch -Wildcard ($v.verdict) {
+  'FAIL*'   { '#f85149'; break }   # red
+  '*NEEDS*' { '#f0883e'; break }   # orange
+  default   { '#3fb950' }          # green
+}
+$verdict_bg = switch -Wildcard ($v.verdict) {
+  'FAIL*'   { '#3a1d1d'; break }
+  '*NEEDS*' { '#3a2a18'; break }
+  default   { '#1f3a2f' }
+}
+$verdict_text = switch -Wildcard ($v.verdict) {
+  'FAIL*'   { '#ffb3ae'; break }
+  '*NEEDS*' { '#ffd7b0'; break }
+  default   { '#aeffad' }
+}
+if ($v.verdict_color) { $verdict_accent = [string]$v.verdict_color }
+
 $parts += "<div style='margin-bottom: 24px;'>"
 $parts += "<div style='font-size: 16px; font-weight: 600; color: #58a6ff; margin-bottom: 12px;'>KEY FINDINGS</div>"
-$parts += "<div style='background: #1f3a2f; padding: 14px; border-left: 4px solid #3fb950; border-radius: 4px; font-size: 12px; line-height: 1.8; color: #aeffad;'>"
+$parts += "<div style='background: " + $verdict_bg + "; padding: 14px; border-left: 4px solid " + $verdict_accent + "; border-radius: 4px; font-size: 12px; line-height: 1.8; color: " + $verdict_text + ";'>"
 $parts += $checks
 $parts += "</div></div>"
 
@@ -189,7 +211,7 @@ $status_emoji = switch -Wildcard ($v.verdict) {
   default { $E_SEARCH }
 }
 $parts += "<div style='background: #1f1f1f; padding: 16px; text-align: center; font-size: 11px; color: #8b949e; border-top: 1px solid #444; border-radius: 0 0 8px 8px;'>"
-$parts += "<b style='color: #f0883e;'>" + $status_emoji + " Status: " + (HtmlEsc $v.verdict) + "</b> - Read-only pre-analysis. Contact team for confirmation. - <i>Emory</i>"
+$parts += "<b style='color: " + $verdict_accent + ";'>" + $status_emoji + " Status: " + (HtmlEsc $v.verdict) + "</b> - Read-only pre-analysis. Contact team for confirmation. - <i>Emory</i>"
 $parts += "</div>"
 
 $parts += "</div>"  # end outer wrapper
