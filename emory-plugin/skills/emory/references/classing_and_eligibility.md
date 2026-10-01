@@ -57,8 +57,8 @@ FROM dbo.V_PROGRAM_VEHICLE_CLASS
 WHERE program_id = {program_id}
   AND (Product_Code = '{product_code}' OR Product_Code IS NULL)
   AND (Make = '{make_normalized}' OR Make = 'ALL MAKES')
-  AND (Model LIKE '%'+'{model_token}'+'%' OR '{model_token}' LIKE '%'+Model+'%'
-       OR Model = 'ALL MODELS')
+  AND (ISNULL(Model,'') = '' OR Model = 'ALL MODELS'          -- make-level rows (MAKE, MAKEENGINE, MAKEFUELTYPE ...)
+       OR Model LIKE '%'+'{model_token}'+'%' OR '{model_token}' LIKE '%'+Model+'%')
   AND {year} BETWEEN ISNULL(NULLIF(Model_Year_From,0),1900)
                  AND ISNULL(NULLIF(Model_Year_To,0),9999)
   AND GETDATE() BETWEEN ISNULL(Effective_Date, GETDATE())
@@ -74,12 +74,20 @@ FROM STAGING.EAS.PROGRAM_VEHICLE_CLASS
 WHERE PROGRAM_ID = {program_id}
   AND (PRODUCT_CODE = '{product_code}' OR PRODUCT_CODE IS NULL)
   AND (MAKE = '{make_normalized}' OR MAKE = 'ALL MAKES')
-  AND (MODEL LIKE '%' || UPPER('{model_token}') || '%' OR UPPER('{model_token}') LIKE '%' || MODEL || '%'
-       OR MODEL = 'ALL MODELS')
+  AND (COALESCE(MODEL,'') = '' OR MODEL = 'ALL MODELS'
+       OR MODEL LIKE '%' || UPPER('{model_token}') || '%' OR UPPER('{model_token}') LIKE '%' || MODEL || '%')
   AND {year} BETWEEN COALESCE(MODEL_YEAR_FROM, 1900) AND COALESCE(MODEL_YEAR_TO, 9999)
   AND CURRENT_DATE BETWEEN COALESCE(EFFECTIVE_DATE, CURRENT_DATE)
                        AND COALESCE(EXPIRATION_DATE, CURRENT_DATE);
 ```
+> **⚠ Make-level classing (fixed 2026-10-01).** About **21,000** class rows have a **blank model**
+> (`ClassingMethod` MAKE 14,866 · MAKEENGINE 2,454 · MakeVehicleType 1,905 · MAKEFUELTYPE 1,153 ·
+> MakeVehicleCondition 774 …). The old model filter (`Model LIKE … OR Model = 'ALL MODELS'`) dropped
+> every one of them, so any make-level program (e.g. Mazda 20320) came back as a false **"no class"**.
+> The queries above now accept a blank model. **Most specific match wins:** if a named-model row
+> matches, use it and ignore the make-level rows (Mazda MZSP: RX-8 = class 3, every other Mazda = class 2).
+> Verified on `MAZ42024` / MZSP / 2026 Mazda CX-5 → class 2.
+
 **Cite both the Tier 2 result (primary) and note if Snowflake confirmation succeeded.** If Tier 2 returns nothing, state that explicitly in the verdict rather than retrying with alternate clauses — a genuine classing gap is worth flagging as NEEDS REVIEW.
 - **Normalize before matching** (this is where classing lookups fail):
   - Make: map the VIN-decoded make to the classing vocabulary

@@ -1,6 +1,6 @@
 {
   "name": "emory",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Safe-Guard API-support triage agent. Point it at a case (pasted, attached, open in Salesforce, or in email) and it routes across three platforms — EAS, Legacy/Forte, and RoadRunner — via a one-hop dealer-profile preload, runs five read-only configuration checks against live data, automatically live-fires the real rating API for platforms where the quote is computed at request time, and returns a routable verdict plus a paste-ready SR summary — never concluding 'the API is broken' until every config check passes.",
   "author": {
     "name": "Eric Durrant — Safe-Guard Products International"

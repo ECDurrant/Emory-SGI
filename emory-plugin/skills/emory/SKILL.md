@@ -17,6 +17,11 @@ description: >-
 
 # Emory — Case Pre-Investigation Assistant
 
+**Version 2026-10-01.** If asked "what version are you, and how do you route a case?", answer with
+this date and: "I route by where the product is active for the dealer today, across EAS, RoadRunner
+and Legacy (router R1 in `references/routing.md`); the dealer-code prefix is only a tie-breaker."
+An answer about prefixes alone means an outdated copy.
+
 ## Core principle
 Gather the facts an analyst would gather by hand — dealer status, product, forms,
 rates, classing — deterministically and read-only, then hand back a cited verdict.
@@ -64,13 +69,16 @@ skill unwieldy in the first place.
 | `references/duplicate_check.md` | Running the Step 0b contract and SR dedup probes |
 | `references/rates_layer.md` | Check 5 — rate systems, SKU rows, live-fire |
 | `references/classing_and_eligibility.md` | Check 6 — VIN decode and vehicle classing |
-| `references/roadrunner.md` | Step 0 routed the case to RoadRunner |
+| `references/routing.md` | **Step 0, every case** — router R1 decides EAS / RoadRunner / Legacy from live enrolment; OEM→platform→rate-source map; open gaps G1–G7 |
+| `references/roadrunner.md` | The router returned ROADRUNNER |
+| `references/legacy_forte.md` | The router returned LEGACY — fixed Legacy checks L0–L4 (Snowflake `STAGING.CMS`, Postgres-portable) |
 | `references/sibling_diff.md` | A product looks anomalous against its family |
 | `references/eligibility_matrix.md` | Step 7 — the eligibility cross-check |
 | `references/verdict_and_delivery.md` | Writing the executive summary; posting the card |
 | `rating_attributes_reference.md` | The case turns on `financeType`/`vehicleCondition`/`vehicleUsage`/`isAfterSale` |
 | `aggregator_integration_partners.md` | Naming the integration partner / aggregator on the SR |
 | `case_classification_picklists.md` | Filling in inquiry type, sub-type, SR category |
+| `references/api_quick_tips.md` | **Step 0a** — the SR quotes an API error message or a dealer/provider code prefix; deciding caller-side vs config |
 
 ---
 
@@ -85,7 +93,7 @@ to a live DB only for the specific reasons listed.
 
 | Tier | Connector | Tool | Holds | When to use |
 |---|---|---|---|---|
-| **1 (default for most checks)** | **Snowflake** | `mcp__e3c4bd18-9380-48b0-b052-fde6c66f2dae__execute-sql` | `STAGING.EAS.*` (EAS config replica) + `STAGING.CMS.*` (Forte/CMS replica) | **First, for most checks.** Fast, one connector for both platforms. |
+| **1 (default for most checks)** | **Snowflake** | `mcp__e3c4bd18-9380-48b0-b052-fde6c66f2dae__execute-sql` | `STAGING.EAS.*` (EAS config replica) + `STAGING.CMS.*` (Forte/CMS replica) + `STAGING.RR_UTILITY.*` (RoadRunner, daily) | **First, for most checks.** Fast, one connector for all three platforms. **Never `STAGING.RR.*`** — frozen since 2024-08-13. |
 | **2 (PRIMARY for classing)** | **Live EAS (SQL Server)** | `mcp__sqlserver__run_query` | `dbo.*` EAS config, real-time | **Always search here FIRST for vehicle classing** (`V_PROGRAM_VEHICLE_CLASS`). Also for: config changed **today**, tables not replicated, or name-based matching needed. After EAS classing query succeeds, confirm with Snowflake Tier 1. |
 | **3** | **Live Forte (Postgres / pgAdmin)** | `mcp__postgresql-mcp__run_query` | legacy CMS config + contracts (`sg_con_m1`, PII) | Legacy real-time, contract lookups, or CMS detail not in the replica. |
 | **4 (wired 2026-08-19, awaiting client restart)** | **MongoDB** (`sg-prod-mg-atlas-clst-pl-0`) | `mongodb-gm` (official `mongodb-mcp-server` v2.1.0, `--readOnly`, wired into `wrapped_servers.json`/`claude_desktop_config.json` same pattern as ms365/postgresql-mcp/sqlserver) | Databases confirmed visible via Compass OIDC login: `GM`, `GM_Amazon`, `GM_D2C`, `HCI`, `HCI20`, `HCI2O`, `HCI2O_Amazon`, `HCI_Amazon`, `BMW_Amazon`, `Honda`/`HONDA`/`Honda_Amazon`, `ECOM_AUTO`, `ExtraProtect_Amazon`, `AOD`, `Autos_Amazon`, `RECREATION` — almost certainly the actual source data behind the "rate ceiling" platforms (see below). Contents/schema still not explored. | **Auth is solved, not blocked** — Ed's own Azure AD identity (`edurrant@sgintl.com`) already has working OIDC access to this cluster (confirmed live via Compass 2026-08-19, no separate app-registration ask needed). It's a "Workforce" (human/browser) OIDC flow, not machine-to-machine — expect a browser sign-in prompt on first real query, similar to the MS365 device-code pattern. **Not yet usable this session** — a brand-new MCP server needs a client restart/reconnect to register; confirmed via `ToolSearch` finding nothing yet. Read-only enforcement already verified at the process level (create/update/delete tools correctly refuse to register under `--readOnly`). |
@@ -95,9 +103,29 @@ to a live DB only for the specific reasons listed.
 - `STAGING.EAS.*` = **nightly** sync (~04:21). Config edited *today* may not be there yet → if a row is missing and the case says "just set up", re-check Tier 2.
 - `STAGING.CMS.*` = **same-day** Forte replica. Treat as current.
 
-**Not replicated to Snowflake (must use Tier 2/3):**
-`Program_Product_Eligibility`, `V_DEALER_PRODUCT_PLAN_EXCEPTIONS`,
-`Dealer_Cross_Reference`, `RATE_SKU_HCI2O`.
+- `STAGING.RR_UTILITY.*` = **daily** RoadRunner sync. `STAGING.RR.*` is a dead 2024 copy — never read it.
+
+**Not replicated to Snowflake (must use Tier 2/3)** — re-verified 2026-10-01:
+`Program_Product_Eligibility`, `V_DEALER_PRODUCT_PLAN_EXCEPTIONS`, `Dealer_Cross_Reference`,
+`Related_Dealer_Product_Exclusion`, and three rate tables: **`Rate_sku_SG_Agents`** (20376),
+**`RATE_SKU_LITHIA_NVR`** (20389), **`RATE_SKU_NISSAN_CA`** (20273). The live web-service call log
+is SQL Server `dbo.BI_V_Ws_Call_log` only — Snowflake's `BI_V_WS_CALL_LOG` is a one-day 2026-05-11
+snapshot. (`RATE_SKU_HCI2O` **is** replicated now — 1.3M rows.)
+
+**If an MCP DB tool returns "outputSchema defined but no structured output returned"**, the
+Prompt Security wrapper swallowed an error. Query directly instead: SQL Server via pyodbc
+(`DRIVER={ODBC Driver 18 for SQL Server};SERVER=QTSPRODEASDB3;DATABASE=SGEAS_DIFF;Trusted_Connection=yes;TrustServerCertificate=yes`),
+Forte via psycopg2 (needs GlobalProtect). Python 3.13 at `%LOCALAPPDATA%\Programs\Python\Python313`.
+
+**Fixed tools first (MCP `emory` server, 2026-10-01).** When the `emory` MCP tools are loaded, run
+**`emory_check_case`** (dealer, product, VIN) before writing any SQL. It runs P1 → router R1/R2 → the routed
+platform's checks (EAS: product, forms, rate system, rates on both pricing paths · RoadRunner: RR1 · Legacy:
+L0/L1) → VIN decode + classing → duplicate contracts, all as verified, parameterised queries. Each step
+returns PASS / FAIL / NEEDS_REVIEW with the rows and **ready-made `verification` lines** for the card.
+Drill in with `emory_route`, `emory_eas_checks`, `emory_roadrunner_checks`, `emory_legacy_checks`,
+`emory_vin_classing`, `emory_duplicate_contracts`, `emory_call_log`; write your own SQL only for a step
+the tools marked FAIL or NEEDS_REVIEW. Prove the tools on any machine with
+`python -m emory_agent.selftest` (13 live cases, 13/13 on 2026-10-01).
 
 **Query hygiene:** lead every statement with `SELECT`/`WITH` (never a leading
 comment). Snowflake: `ROW`/`ROWS` is reserved (alias counts as `row_count`); use
@@ -135,6 +163,15 @@ At the start of every run, make sure a Salesforce tab is open and warm: check
 `mcp__Claude_Browser__tabs_context`, open `https://safe-guardproducts.my.salesforce.com/` if
 nothing is there, inject the idempotent keep-alive script, and report browser status in the
 opening banner. This keeps the session alive across an investigation that spans several turns.
+
+**Keep Salesforce open for the whole run (09-28/09-29 rule):** inject the **stay-awake + keep-alive snippet**
+(`references/browser_and_intake.md` -> "Stay-awake clicker") in the parked tab and in every working tab, and again after
+every `navigate`; it presses Salesforce's "Still there? / Continue Working" button automatically and pings the session
+every 5 minutes. Then:  park a second tab on Lightning home with the
+keep-alive at a 5-minute interval and never navigate it; re-inject in the working tab after every `navigate`;
+after each navigation check the hostname/title for the SAML bounce (`login.microsoftonline.com`, `/saml2/logout`,
+a `Lightning Experience` title that never resolves) **before** writing anything; on a bounce, stop and pause.
+Details and the wrong-`filterName` trap: `references/browser_and_intake.md` -> "Session continuity rules".
 
 If login is required, **pause for the analyst to sign in — never attempt credential entry.**
 If Salesforce is genuinely unreachable, mark the Step 0b dedup check "NOT checked — Salesforce
@@ -178,95 +215,116 @@ Connect** payment problems.
 - Both (e.g. a contract-association problem blocking a claim) → note the dependency; claims
   work goes to `apibrain-claims`, the contracting/rating piece stays with Emory/CMS.
 
+### Step 0a-2 — Caller-side or ours? (when the SR quotes an error message)
+
+If the case quotes an API error message or response code, check it against
+**`references/api_quick_tips.md` Section A** *before* running the five checks. That table
+is the partner-facing guide PEN was given, so it maps each recurring message to the XML
+field it points at.
+
+- **Caller-side row** (`retail price is not matching`, `sellerId must be 8 characters long`,
+  `Format is invalid`, `vin does not exist`, `Endpoint request timed out`) → the fix is a
+  value in the submitted request, not our config. Name the field, cite the Quick Tips row,
+  and don't burn the five checks on config that is fine. Verify the claim against the
+  payload first — don't bounce a ticket back on the strength of the message alone.
+- **Config row** (`No products were available for this dealer`, `has not been set up…
+  CMSID`, `500 / rate could not be calculated`) → continue to Step 0 and run the checks.
+- **Dealer/provider code prefix** in the SR → Section B names the likely program, which is
+  a *hint for Step 0 routing only*. The resolved `V_DEALER` / `cms_dealer_number` value
+  always wins over the prefix.
+- **Intake gaps** → Section D is the well-formed-ticket checklist; anything missing there is
+  what the confirmation question should ask for.
+
 ---
 
 ## Step 0 — Which platform services this case? (this drives everything else)
 
 SGI runs **three** dealer/config platforms, and **the same dealer code is written to
 more than one of them** — so you cannot infer the platform from the code alone. Presence
-≠ the platform that services the case; the **program/product** decides. Sizes + overlap
-(prod replica, verified 2026-08): EAS `V_DEALER` **60,334** · Legacy `SG_DLR_M1`
-**137,037** · RoadRunner `RR.DEALER` **55,277**; EAS∩Legacy **45,682**, RR∩EAS **39,396**,
-RR∩Legacy **40,373**, RR-only just **291**. Legacy/Forte is the superset backstop.
+≠ the platform that services the case; **live enrolment of the product** decides.
+Overlap (verified 2026-08): EAS∩Legacy **45,682**, RR∩EAS **39,396**, RR∩Legacy **40,373**.
+Sizes 2026-10-01: EAS `V_DEALER` **61,047** · Legacy `SG_DLR_M1` **137,544** · RoadRunner
+`RR_UTILITY.DEALER` **58,001**. Legacy/Forte is the superset backstop.
 
 | Platform | Where (Snowflake, Tier 1) | Live fallback | Dealer master |
 |---|---|---|---|
-| **EAS** — modern VCI / luxury / HPP | `STAGING.EAS.*` | SQL Server (Tier 2) | `V_DEALER.CMS_DEALER_NUMBER` |
-| **Legacy / Forte** — superset | `STAGING.CMS.*` | Postgres (Tier 3) | `SG_DLR_M1.SG_DLR_DEALER` |
-| **RoadRunner (RR)** — GM + e-com | `STAGING.RR.*` (+ `RR_UTILITY`, `RR_DEALER_CONFIGURATION`) | — Snowflake only | `RR.DEALER.DEALER_CODE` |
+| **EAS** — VCI / luxury / Mopar / Toyota / Honda 2.0 / HCI 2.0 / Agents … | `STAGING.EAS.*` (nightly) | SQL Server (Tier 2) | `V_DEALER.CMS_DEALER_NUMBER` |
+| **Legacy / Forte** — superset | `STAGING.CMS.*` (same-day) | Postgres (Tier 3, VPN) | `SG_DLR_M1.SG_DLR_DEALER` |
+| **RoadRunner (RR)** — GM family + HCI 1.0 | `STAGING.RR_UTILITY.*` (daily) — **never `STAGING.RR.*`** (frozen 2024-08) | — Snowflake only | `RR_UTILITY.DEALER.DEALER_CODE` |
 
-**Dealer profile — one-hop preload (run this FIRST).** One Snowflake query returns platform
-presence + OEM + IDs + status + active programs across all three platforms, so the five checks
-**reuse it instead of re-querying** (replaces the old presence probe + the separate per-platform
-anchor lookups). **It also auto-resolves a plain GM BAC to its platform-specific code** — GM cases
-routinely name the dealer as the bare BAC (e.g. `111145`), but RoadRunner/Legacy store it prefixed
-(`GMF11145`, `CB111145`) and — because the `GMF` field is only 8 chars total — a 6-digit BAC can only
-keep its **last 5 digits** after `GMF` (`GMF12180` for BAC `112180`, dropping the leading digit),
-while the `CB` field has room for the full BAC. Confirmed 2026-08-18 on two separate GM cases
-(Richard Chevrolet `111145`→`GMF11145`; Thompson Chevrolet `112180`→`GMF12180`/`CB112180`) — this
-detour cost real time both times before the fallback below existed:
+**Step 0 = two queries, in this order. Read `references/routing.md` for the full rule.**
+
+1. **Dealer profile (P1, below)** — presence, status, active-product counts and resolved codes on
+   all three platforms in one hop. Auto-expands a bare GM BAC (`111145` → `GMF11145` / `CB111145`;
+   the `GMF` field is 8 chars, so a 6-digit BAC keeps only its **last 5** digits — `112180` →
+   `GMF12180`, while `CB112180` keeps all six).
+2. **Router (R1 in `routing.md`)** — where is **this product** active for this dealer today. One
+   platform → that platform services the case. Several → product-code family decides (HCI 1.0 vs
+   2.0 codes are disjoint; GM is RR-only; Honda/Acura rate on EAS), then the call log (R3). None →
+   R2 tells end-dated vs never-enrolled vs **0-product onboarding shell**.
+
 ```sql
--- Tier 1 (Snowflake). in_eas = EAS product assignments; in_legacy/in_rr = dealer presence.
--- bac_last5/bac_full let a plain numeric BAC resolve to its GMF/CB-prefixed code automatically.
-WITH p AS (SELECT '{code}' AS code,
-                   'GMF'||RIGHT('{code}',5) AS bac_gmf,
-                   'CB'||'{code}'           AS bac_cb),
-eas AS (SELECT COUNT(*) n, ANY_VALUE(DEALER_ID) dealer_id, LISTAGG(DISTINCT PROGRAM_NAME,', ') programs
-        FROM STAGING.EAS.DEALER_PRODUCT_VW WHERE CMS_DEALER_NUMBER=(SELECT code FROM p)),
-lgy AS (SELECT COUNT(*) n, ANY_VALUE(SG_DLR_COMPANY) company, ANY_VALUE(SG_DLR_DEALER) resolved_code,
-               ANY_VALUE(SG_DLR_PLC) plc, ANY_VALUE(SG_DLR_CARRIER) carrier,
-               ANY_VALUE(CASE WHEN SG_DLR_OUTOFBUS<>'1799-12-31' AND SG_DLR_OUTOFBUS<=CURRENT_DATE THEN 'OOB'
-                              WHEN SG_DLR_EDATE<>'1799-12-31'   AND SG_DLR_EDATE  <=CURRENT_DATE THEN 'END_DATED'
-                              ELSE 'ACTIVE' END) status
-        FROM STAGING.CMS.SG_DLR_M1, p
-        WHERE SG_DLR_DEALER IN (p.code, p.bac_cb)),
-rr  AS (SELECT COUNT(DISTINCT d.DEALER_ID) n, ANY_VALUE(d.DEALER_NAME) name, ANY_VALUE(d.DEALER_STATE) st,
-               ANY_VALUE(d.DEALER_CODE) resolved_code, ANY_VALUE(d.OUT_OF_BUSINESS_DATE) oob,
-               LISTAGG(DISTINCT pg.PROGRAM_NAME,', ') programs
-        FROM STAGING.RR.DEALER d, p
-        LEFT JOIN STAGING.RR.DEALER_PRODUCT dp ON dp.DEALER_ID=d.DEALER_ID
-        LEFT JOIN STAGING.RR.PROGRAM pg        ON pg.PROGRAM_ID=dp.PROGRAM_ID
-        WHERE d.DEALER_CODE IN (p.code, p.bac_gmf, p.bac_cb))
-SELECT (SELECT code FROM p) AS code,
-       COALESCE(eas.n,0) AS in_eas, COALESCE(lgy.n,0) AS in_legacy, COALESCE(rr.n,0) AS in_rr,
-       eas.dealer_id AS eas_dealer_id, eas.programs AS eas_programs,
-       lgy.company, lgy.status AS legacy_status, lgy.plc AS legacy_plc, lgy.carrier AS legacy_carrier,
-       lgy.resolved_code AS legacy_resolved_code,
-       rr.name AS rr_name, rr.st AS rr_state, rr.programs AS rr_programs, rr.resolved_code AS rr_resolved_code
+-- P1 — Tier 1 (Snowflake). Dealer profile across EAS / Legacy / RoadRunner. Verified 2026-10-01.
+WITH p AS (SELECT UPPER(TRIM('{code}')) AS code),
+k AS (SELECT code c FROM p UNION SELECT 'GMF'||RIGHT(code,5) FROM p WHERE code RLIKE '[0-9]{5,6}'
+      UNION SELECT 'CB'||code FROM p WHERE code RLIKE '[0-9]{5,6}'),
+eas AS (SELECT COUNT(DISTINCT v.DEALER_ID) n, ANY_VALUE(v.DEALER_ID) dealer_id, ANY_VALUE(v.CMS_DEALER_NUMBER) resolved_code,
+               LISTAGG(DISTINCT v.PROGRAM_NAME, ', ') programs,
+               (SELECT COUNT(*) FROM STAGING.EAS.DEALER_PRODUCT_CODE x
+                  JOIN STAGING.EAS.V_DEALER v2 ON v2.DEALER_ID = x.DEALER_ID JOIN k k2 ON v2.CMS_DEALER_NUMBER = k2.c
+                 WHERE CURRENT_DATE BETWEEN x.EFFECTIVE_SALE_DATE AND x.EXPIRATION_SALE_DATE) active_products
+        FROM STAGING.EAS.V_DEALER v JOIN k ON v.CMS_DEALER_NUMBER = k.c),
+lgy AS (SELECT COUNT(*) n, ANY_VALUE(m.SG_DLR_COMPANY) company, ANY_VALUE(m.SG_DLR_DEALER) resolved_code,
+               ANY_VALUE(m.SG_DLR_CARRIER) carrier,
+               ANY_VALUE(CASE WHEN m.SG_DLR_OUTOFBUS <> '1799-12-31' AND m.SG_DLR_OUTOFBUS <= CURRENT_DATE THEN 'OOB'
+                              WHEN m.SG_DLR_EDATE    <> '1799-12-31' AND m.SG_DLR_EDATE    <= CURRENT_DATE THEN 'END_DATED'
+                              ELSE 'ACTIVE' END) status,
+               (SELECT COUNT(*) FROM STAGING.CMS.SG_DRS_M1 d JOIN k k2 ON d.SG_DRS_DEALER = k2.c
+                 WHERE d.SG_DRS_SDATE <= CURRENT_DATE AND (d.SG_DRS_EDATE = '1799-12-31' OR d.SG_DRS_EDATE >= CURRENT_DATE)) active_enrolments
+        FROM STAGING.CMS.SG_DLR_M1 m JOIN k ON m.SG_DLR_DEALER = k.c),
+rr AS (SELECT COUNT(DISTINCT d.DEALER_ID) n, ANY_VALUE(d.DEALER_NAME) name, ANY_VALUE(d.DEALER_STATE) st,
+              ANY_VALUE(d.DEALER_CODE) resolved_code, ANY_VALUE(d.OUT_OF_BUSINESS_DATE) oob,
+              LISTAGG(DISTINCT CASE WHEN CURRENT_DATE BETWEEN dp.EFFECTIVE_DATE_START
+                                    AND COALESCE(dp.EFFECTIVE_DATE_END,'3000-01-01') THEN pg.PROGRAM_NAME END, ', ') programs,
+              COUNT(DISTINCT CASE WHEN CURRENT_DATE BETWEEN dp.EFFECTIVE_DATE_START
+                                  AND COALESCE(dp.EFFECTIVE_DATE_END,'3000-01-01') THEN dp.DEALER_PRODUCT_ID END) active_products
+       FROM STAGING.RR_UTILITY.DEALER d JOIN k ON d.DEALER_CODE = k.c
+       LEFT JOIN STAGING.RR_UTILITY.DEALER_PRODUCT dp ON dp.DEALER_ID = d.DEALER_ID
+       LEFT JOIN STAGING.RR_UTILITY.PROGRAM pg        ON pg.PROGRAM_ID = dp.PROGRAM_ID)
+SELECT (SELECT code FROM p) code,
+       eas.n in_eas, eas.resolved_code eas_code, eas.dealer_id eas_dealer_id, eas.programs eas_programs,
+       eas.active_products eas_active_products,
+       lgy.n in_legacy, lgy.resolved_code legacy_code, lgy.company, lgy.status legacy_status,
+       lgy.carrier legacy_carrier, lgy.active_enrolments legacy_active_enrolments,
+       rr.n in_rr, rr.resolved_code rr_code, rr.name rr_name, rr.st rr_state, rr.oob rr_oob,
+       rr.programs rr_programs, rr.active_products rr_active_products
 FROM eas, lgy, rr;
 ```
-- **Carry the profile forward — don't re-look-up:** `eas_dealer_id` + `eas_programs` seed the EAS
-  checks; `legacy_plc`/`legacy_carrier`/`legacy_status` seed the Legacy checks (→ `SG_DRS_M1`);
-  `rr_*` seed the RR checks. This is the efficiency win — one query instead of four.
-- **Always report `rr_resolved_code`/`legacy_resolved_code` in the verdict** when they differ from
-  the case's `{code}` — the analyst (and any human downstream) needs the real platform code, not
-  just confirmation that *something* matched.
-- All three zero → resolve by name/phone; still nothing → **NEEDS REVIEW** (unknown dealer).
-- Multiple hits are **normal** (codes are multi-written). Pick where to look **first** via the
-  **prefix bias** below × presence, then confirm the product/program is configured there.
-- **Status nuance:** a Legacy `OOB`/`END_DATED` does **not** mean inactive if the dealer is live on
-  EAS or RR — judge status on the platform that services the case (verified 2026-08: `AU422A33` is
-  `OOB` in Legacy yet active in EAS). Freshness: `in_eas` comes from the nightly `DEALER_PRODUCT_VW`;
-  if the case says "just set up," re-check Tier 2.
+- **Verified 2026-10-01** on `HPPNM027`: `in_eas 1 · eas_active_products 0` (onboarding shell) ·
+  `in_legacy 1 · legacy_active_enrolments 0` · `in_rr 0`. The previous profile read EAS presence from
+  `DEALER_PRODUCT_VW` and so reported shells as **absent** from EAS, and read RoadRunner from the
+  frozen `STAGING.RR` — both fixed.
+- **Carry the profile forward — don't re-look-up:** `eas_dealer_id` seeds the EAS checks,
+  `legacy_code`/`legacy_carrier` seed L1 in `legacy_forte.md`, `rr_code` seeds RR1 in `roadrunner.md`.
+- **Always report `*_code` in the verdict** when it differs from the case's `{code}`.
+- All three `n = 0` → resolve by name/phone; still nothing → **NEEDS REVIEW** (unknown dealer).
+- `*_active_products = 0` with `n = 1` → the dealer exists but sells nothing there (shell or fully
+  end-dated) — check gap G3 in `routing.md` before calling it a one-off.
+- **Status nuance:** a Legacy `OOB`/`END_DATED` does **not** mean inactive if the router puts the
+  case on EAS or RR — judge status on the platform that services the case (`AU422A33` is `OOB` in
+  Legacy yet active on EAS 20285 AUDI, re-verified 2026-10-01).
 
-**Dealer-code prefix → OEM + first-search bias** (validated against live counts 2026-08;
-a *bias* to confirm, never proof — always verify the product in the chosen platform):
+**Dealer-code prefix → first-search bias** — a tie-breaker only, *after* R1 (re-validated
+2026-10-01 against live enrolment; full OEM → platform → rate-source map in `routing.md` §2):
 
-| Prefix(es) | OEM / channel | Look FIRST |
+| Prefix(es) | OEM / channel | Platform |
 |---|---|---|
-| `AU` `VW` `0MB`/`00MB` `PORS` `TOY` `CCC` `BENT` `LAMB` `AM` `JAG` `LRV` `LEX` `MAZ` `SU` `00HD` `G`(BMW) | VCI / luxury | **EAS** (dual with Legacy) |
-| `HPP` | Hyundai HPP | **EAS** |
-| `GMF` `CB` + many numeric codes | GM | **RoadRunner** |
-| `HYU` `0KM` `0GF` `HF` `0PP` | Hyundai / Kia / Genesis / Honda **e-com** | **RoadRunner** (then Forte); **not EAS** (~0 there) |
-| `00S` | SGI Agents | **Legacy** (also spread across EAS/RR) |
-
-> **Corrects the old "e-com → Forte" rule:** the Kia/Hyundai/Genesis/Honda e-com dealers
-> are **absent from EAS but present in RoadRunner** (`STAGING.RR`) as well as Legacy. For
-> these, check **RR config** — `RR.DEALER_PRODUCT`, `RR.PROGRAM`/`RR.PRODUCT`, `RR.CLASS`,
-> `RR.FORM_PRODUCT_STATE`, `RR.PRODUCT_SKU_PRICING_OPTION` — for the modern config, not just
-> Forte. RoadRunner is reachable **now via the existing Snowflake connection** (no new
-> connector). RR-specific five checks — including VIN→class — are wired below under
-> **"RoadRunner (RR) checks."**
+| `AU` `VW` `0MB`/`00MB` `PORS` `TOY` `LEX` `CCC` `BENT` `LAMB` `AM` `MAZ` `SU` `00HD` `G`(BMW) | VCI / luxury / Toyota / Mazda / Subaru / Harley | **EAS** (dual-written to Legacy) |
+| `HPP` `GPP` `PKM` | HCI 2.0 (HPP / GPP / Kia PPES) | **EAS** 20378-20381 — products `HF*` `GF*` `KF*` `WF*` |
+| `HYU` `HYN` `0HY` `0PP` `GEN` `0GF` `0KM` | HCI 1.0 Hyundai / Genesis / Kia | **RoadRunner** prog 1-3 — products `HY*` `GE*` `PK*` `PP*` `EH*` |
+| `GMF` `GMJ` `CB*` `GM9` `ACF` + bare numeric BACs | GM / CarBravo / ACF | **RoadRunner** (EAS GM programs have 0 active dealers) |
+| `HN*` `AC*` | Honda / Acura US | **EAS** 20350/20351 (`RATE_SKU_HONDA2O`); RR Honda rates have 0 active rows |
+| `00S` | SG Agents | **EAS** 20376 (rates SQL Server `Rate_sku_SG_Agents`); Legacy plans ended 2026-09-18 |
 
 ---
 
@@ -403,6 +461,40 @@ Two questions, in order. **5a — is a rate system assigned** to this dealer for
 for the program/product/rate-system/class on the sale date? 5b's window is the actual truth for
 "is this live right now."
 
+> **⚠️ The ONE exception where 5a dates ARE the finding — and the exact form it must take
+> (INC1320603, corrected 2026-09-15).**
+>
+> `FDP_SYNC` **terminates** an enrollment by writing `Sales_Expiration_Date` *before*
+> `Sales_Effective_Date` (e.g. exp `2026-07-23` vs eff `2026-07-24`), then normally writes a
+> **fresh open row** (`9999-12-31`) to re-enrol. **The inversion by itself is NOT a defect —
+> terminate-then-re-enrol is routine churn.** The defect is a termination with **no open
+> replacement**. An inverted-row-only query over-reports badly: it returned 10 dealers where only
+> **5** were actually broken.
+>
+> So aggregate per dealer and require `has_open = 0`, querying the **base table**
+> (`V_Rate_System_Application` omits `Updated_Date`/`Updated_By`):
+> ```sql
+> WITH r AS (
+>   SELECT Dealer_ID,
+>          MAX(CASE WHEN Sales_Expiration_Date >= '9999-01-01' THEN 1 ELSE 0 END) AS has_open,
+>          MAX(CASE WHEN Sales_Expiration_Date < Sales_Effective_Date THEN 1 ELSE 0 END) AS has_inverted
+>   FROM dbo.RATE_SYSTEM_APPLICATION
+>   WHERE Program_ID = {program} AND Rate_System_ID = {rate_system}
+>   GROUP BY Dealer_ID)
+> SELECT * FROM r WHERE has_open = 0 AND has_inverted = 1;
+> ```
+> **Never filter on a literal expiration date** — each sync run writes a different one, so a
+> literal misses dealers.
+>
+> **Expect apparent refutation, and resolve it properly.** An affected dealer will often have
+> plenty of contracts for the product, which looks like proof the window isn't enforced. Two things
+> settle it: the contract **dates** (do they all predate the termination?) and whether a
+> **replacement row** exists. Confirm enforcement by finding a dealer whose VSC resumed just after
+> a replacement row appeared, and/or dealers left unreplaced who have never sold the product.
+>
+> Owner: **FDP / DBA** — the ask is *why re-enrolment never arrived*, not "stop writing inverted
+> dates". Plus **Rates & Forms / Account Management** to re-enrol. See pattern #18.
+
 For platforms where the quote is **computed at request time** rather than stored, config alone
 cannot answer the question — live-fire the real rating API and read the response.
 
@@ -432,18 +524,26 @@ No class → **FAIL** (classing gap; owner Pricing / Risk). Several conflicting 
 **Read `references/classing_and_eligibility.md`** for the VIN-decode and classing queries, the
 token-matching patterns, and the rate-group tiebreak.
 
-### RoadRunner (RR) checks — Snowflake `STAGING.RR` / `RR_UTILITY` (Tier 1, no extra connector)
+### RoadRunner (RR) checks — Snowflake `STAGING.RR_UTILITY` only (Tier 1, no extra connector)
 
-When Step 0 routes to **RoadRunner** (GM plus e-com Hyundai/Kia/Genesis/Honda), run the checks
-against RR instead of EAS or Legacy. Spine: `DEALER.DEALER_ID → DEALER_PRODUCT →
+When the router (R1) returns **RoadRunner** (GM family + HCI 1.0 Hyundai/Kia/Genesis — Honda/Acura
+now rate on EAS), run the checks against `RR_UTILITY` instead of EAS or Legacy. **Never read
+`STAGING.RR.*`** — it stopped syncing on 2024-08-13. Spine: `DEALER.DEALER_ID → DEALER_PRODUCT →
 PRODUCT`/`PROGRAM`; classing in `CLASS`, forms in `FORM_PRODUCT_STATE` (with
 `FORM_PRODUCT_DEALER` overrides), rates in the per-carrier `RR_UTILITY.RATE_SKU_*`.
 
 **RR's open-date sentinel is `3000-01-01`** — not EAS `9999-12-31` or Legacy `1799-12-31`.
 Using the wrong sentinel is how an active row gets read as expired.
 
-**Read `references/roadrunner.md`** for the RR anchor query (dealer + products + program in one
-hop) and the RR equivalent of each check.
+**Read `references/roadrunner.md`** — RR1 runs Checks 1, 2, 4, 5 and 6 in one query (verified
+2026-10-01 on `GMF18645`/`BUVS` → class `B2`, 47,385 active GM rate rows).
+
+### Legacy / Forte checks — Snowflake `STAGING.CMS` (Tier 1; Postgres Tier 3 only for same-day edits)
+
+When the router returns **LEGACY**, **read `references/legacy_forte.md`**: L0 dealer status, L1
+enrolment → rate schedule → D1 versions → D2 rate rows → forms → add-on classing in one query, L2
+VSC classing, L3 add-on classing, L4 contracts. Match the product on the rate schedule
+(`SG_RSC_PLC`), never on the dealer's enrolment plan (`SG_DRS_PLC`) or `SG_DLR_PLC`.
 
 ### Sibling-diff — compare against the product/dealer family (run whenever one product looks anomalous)
 
@@ -593,36 +693,125 @@ contracting/Mercury | enrollment} issue}.
 - Lead with the date. Mask any PII/plaintext password. If a check was NEEDS REVIEW, say
   exactly what a human must still confirm.
 - Then also offer the short **Teams draft** below for channel delivery.
+- **Also put it in the verdict JSON as `salesforce.summary`** (without the date prefix — the fill script
+  dates it) together with the structured classification (`salesforce.brand / inquiry_type / inquiry_subtype /
+  sr_category / integration_partner / aggregator / vin / dealer_number / dealer_name / record_id`). That block is
+  what actually lands in Salesforce — see "Salesforce fill hand-off" below.
 
 ## Teams update (channel delivery)
 
-Emory auto-posts a **professional structured analysis card** to #api-support-intake. The format is built by `emory_post.ps1` from a verdict JSON and renders as a formal business template with these sections:
+Emory auto-posts one card to #api-support-intake. `emory_post.ps1` builds it from the verdict JSON;
+Emory's job is to emit the JSON and call the script, never to hand-build HTML per case.
 
-**Card Structure (rendered HTML):**
-- **🔎 Emory Case Review** header (case title, executive summary, issue overview)
-- **Key Findings** — status matrix (✅ PASS / ❌ FAIL / ? NEEDS REVIEW) for each check
-- **Root Cause Analysis** — primary finding + supporting evidence
-- **Recommended Next Steps** — escalation owner + action type
-- **Case Classification & Routing** — Inquiry Type/Sub-Type/SR Category (Step 7 form fields)
-- **Status badge** — ✅ PASS | ⚠ NEEDS REVIEW | ❌ FAIL with visual highlighting
+### Card layout — executive summary first (analyst spec, 2026-09-22)
 
-### Executive Summary & delivery
+The 2026-09-15 six-section card was judged **too noisy**: five prose boxes before the evidence, each
+restating the last. The card is now four short blocks and a quiet appendix. **Don't reorder.**
 
-The Executive Summary is the headline a decision-maker reads first, so write it for someone with
-**zero** knowledge of Safe-Guard systems, products, APIs, or rating. Three beats in plain English:
-what the dealer experienced, what the investigation found (separating established facts from
-genuine unknowns), then the next action and who owns it.
+| Order | Block | Field(s) | Shape |
+|---|---|---|---|
+| 1 | **Header** | `title`, `sr`, `platform`, `reported`, `reviewed`, `verdict` | title, then one status line: ● verdict · SR · platform · dates |
+| 2 | **Facts** | `issue_line`, `impact_line`, `owner`, `action_line` | Issue / Impact / Owner / Next, one line each, bold grey label |
+| 3 | **Summary** | `summary[]` | multi-item cases only; bullets that ADD to the facts |
+| 4 | **Status** | `status_rows[]` *or* parsed `checks_md` | multi-item: the table; single-dealer: one line, grid in details |
+| 5 | **Key question** / **Next steps** | `key_question`, `question_for`, `actions[]` | question only when a human must decide; list only when ≥ 2 actions |
+| 6 | **Investigation details** (quiet, last) | identifiers, narrative, `checks_md`, `root_cause`, `verification[]`, `classification` | analysts only |
 
-Avoid acronyms (EAS, SKU, DCR), system and table names (Snowflake, Tier 1, `RATE_SKU_VCI`),
-speculative hedging ("might", "could"), and lists of findings — findings belong in Key Findings,
-not the summary.
+**How Teams really renders the card (observed live 2026-09-22).** Teams keeps colour, bold, font
+size, `<p>`, `<br>`, `<ul>/<ol>` and `<table>`; it strips backgrounds, borders, margins, padding,
+uppercase/letter-spacing and font-family, and it draws its **own cell borders on every `<table>`**. So
+the card uses Teams-native primitives only: `<p>` blocks, list elements, coloured `<span>`s, small grey
+labels written in UPPERCASE text, and exactly **one** `<table>` (the Status grid). Never use a table
+for layout; the browser preview (`emory_verdict_card.html`) mimics Teams' borders so this shows up
+before posting. No background is ever set, so colours must read on both Teams themes.
 
-Delivery to Teams runs through `emory_post.ps1`, which builds the card itself from the verdict
-JSON. Emory's job is to emit the JSON and call the script, not to rebuild HTML per case.
+**Five cuts (efficiency review, 2026-09-22) — the card says each thing once:**
+1. "What to do" appears **once**: the Key question when a human must decide, otherwise the Next fact
+   line. The numbered Next steps list renders only when there are **two or more** distinct actions.
+2. `summary` renders only on multi-item cases (`status_rows`) or legacy verdicts with no facts lines
+   (`show_summary: true` forces it). It must add to the facts, never restate them.
+3. Single-dealer Status is **one line** ("5 of 6 checks pass · Rate SKUs need review"); the full grid
+   moves into the details. Multi-item cases keep the table up top because the table *is* the case.
+4. Narrative (`bottom` / `business_impact`) is no longer rendered anywhere.
+5. The status line shows **dates only**: `reported_date` (or the first date found in `reported`) and
+   `reviewed` (defaults to today). Who raised it moves to the details identifiers.
 
-**Read `references/verdict_and_delivery.md`** for the full writing guide with worked before/after
-examples, the card field contract, and the `emory_post.ps1` invocation modes including the
-auto-post toggle and the guardrail that makes hands-off posting safe.
+**The Facts block is what a reader must get in seconds** — `issue_line` (what is not working),
+`impact_line` (who cannot do what), `owner` (a team name, short), `action_line` (the single next action).
+One sentence each, no jargon. `summary` bullets then add only what those four lines do not say —
+never restate them.
+
+**Write the `summary` bullets for someone with zero Safe-Guard knowledge** — one fact per bullet, no
+acronyms, table names, row counts or contract numbers. Model:
+> ▪ Root cause was an incorrect dealer code configured in Inovatec, not a Safe-Guard rating issue.
+> ▪ Inovatec corrected the dealer mapping on 9/3 and testing immediately passed.
+> ▪ One follow-up remains: tell Sam, Zach and Mark the issue is fixed and close the original ticket.
+
+**`status_rows`** is for multi-item cases (several dealers, several products): `{item, id, status,
+note}` per row, `status` = `fixed | working | pass | review | fail | skipped | "Not enrolled"` (free
+text is kept when descriptive). Single-dealer cases leave it out and the Status table is parsed from
+`checks_md` (`N. Check name - PASS - detail`), so keep that line shape. **Check names are canonical
+and short** (SR dedup, Duplicate contract, Dealer, Product, Form, Rate system, Rate SKU, Classing,
+Eligibility rule, Live API, Request payload) - qualifiers like "(request)" go in the detail. `sr` is the
+ticket ID only; `owner` is one team; each action is **owner in bold + one sentence (<= 25 words)**.
+Longer text is not lost - the renderer moves it into the details - but the top of the card is what the
+team reads, so write for it (full rules: `references/verdict_and_delivery.md`, Readability contract).
+
+**`key_question`** is ONE question the owner can answer yes/no; `question_for` names them. It still
+**confirms intent before presuming a fault** — when a config change has an owner you have not spoken
+to, the question is "was this intentional?", not "fix it".
+
+**Finding labels:** the card shows **Setup is correct / Setup issue found / Decision needed** for PASS / FAIL /
+NEEDS REVIEW. Keep emitting the three JSON values; never write the display words into `verdict`.
+
+**Set `pattern`** on every verdict: one short root-cause pattern name from the controlled list in
+`references/verdict_and_delivery.md` (e.g. `Rate system end-dated`, `Classing gap`, `Working as designed`).
+It is not shown on the card; the daily digest counts recurrences with it.
+
+**Legacy fields still render** (`issue_line`/`impact_line`/`action_line` → summary bullets,
+`confirm` → key question, `bottom`/`business_impact` → Narrative inside the details), so older
+verdict JSON is not broken — but new cases should populate `summary`, `key_question`, `question_for`.
+
+**Collapsing the details.** Teams strips `<details>/<summary>` from HTML messages, so the HTML card
+relies on Teams' own "See more" fold (the details block is last and visually quiet). The poster also
+ships an **Adaptive Card** (`card` field, `Action.ToggleVisibility` → "Show investigation details")
+which is a true collapse; it goes live once the delivery flow gains a *Post card in a chat or channel*
+step bound to `triggerBody()?['card']`. See `references/verdict_and_delivery.md`.
+
+**Look:** strictly minimal — **no panels, borders, rounded boxes, accent bars or pills** (the analyst
+rejected those as "Claude-like panels"), and nothing Teams would strip anyway; sections are separated
+by whitespace only; small grey uppercase labels, status dots, one accent (the verdict). Fonts: **Aptos** (Microsoft 365 default, present on every
+Teams client) and Cascadia Mono for IDs; web fonts cannot be loaded into a Teams message. Body copy
+14px near-white, nothing under 12.5px.
+
+**Daily digest:** `emory_digest.ps1` posts a weekday-morning channel summary (yesterday's cards, questions
+waiting on an owner, key metrics, 14-day trend) from the local delivery log the poster writes. It is a
+separate post — never add counts or timelines to the verdict card. Details in
+`references/verdict_and_delivery.md`.
+
+**Read `references/verdict_and_delivery.md`** for the field contract, writing guide, and the
+`emory_post.ps1` invocation modes (auto-post toggle, verification gate, `-EmitTemplate`).
+
+## Salesforce fill hand-off (ownership, classification, SR Summary Detail) — automatic, zero tokens
+
+**Emory never drives the SR form.** The 09-28 manual fill cost ~95 browser calls for six SRs and leaked a
+summary into the Description field. Instead:
+
+1. Every verdict JSON carries a **`salesforce` block** (contract in `references/verdict_and_delivery.md`):
+   real picklist values only (`case_classification_picklists.md`), `record_id` taken from the SR URL
+   (`/lightning/r/…/a03…/view`) at intake, `summary` = the SR Summary Detail paragraph, `accept` = true when the
+   verdict is resolved (PASS/FAIL), false for NEEDS REVIEW unless the analyst says otherwise.
+2. `emory_post.ps1` drops that block into `Downloads\EmorySF\inbox\<SR>.json` on every run — nothing extra to do.
+3. `sf_fill\sf_fill.py` (this skill folder; launcher `Downloads\EmorySF\watch.cmd`) fills the SR: Accept,
+   picklists, dual-listbox categories, lookups, VIN/dealer, and **appends** the dated summary. It diffs against the
+   record first (already-correct fields are skipped), validates every value, reads back after Save, logs to
+   `EmorySF\sf_fill_log.csv` and records the result in `EmorySF\state\filled.json`.
+4. **Check `EmorySF\state\filled.json` at intake** — an SR listed there was already filled; don't propose it again,
+   only add a new dated summary entry if something changed.
+5. If the analyst asks Emory to "fill out the case" and the watcher isn't running, say: run
+   `Downloads\EmorySF\dry-run.cmd` then `fill.cmd` — do not click through the form with browser tools.
+
+Failures land in `EmorySF\failed\` with a screenshot; the record page itself is only ever READ by Emory.
 
 ## Capturing learnings to the SOP (keep the brain current)
 

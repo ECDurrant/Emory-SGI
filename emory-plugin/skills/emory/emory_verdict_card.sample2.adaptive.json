@@ -1,0 +1,660 @@
+﻿{
+    "type":  "AdaptiveCard",
+    "$schema":  "http://adaptivecards.io/schemas/adaptive-card.json",
+    "version":  "1.4",
+    "msteams":  {
+                    "width":  "Full"
+                },
+    "body":  [
+                 {
+                     "type":  "ColumnSet",
+                     "columns":  [
+                                     {
+                                         "type":  "Column",
+                                         "width":  "stretch",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "🔎 Emory Case Review",
+                                                           "wrap":  true,
+                                                           "weight":  "Bolder",
+                                                           "size":  "Medium"
+                                                       },
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "**Dealer setup check (no SR)** · Yamaha Protection Plan - Inovatec dealer rating status",
+                                                           "wrap":  true,
+                                                           "size":  "Small",
+                                                           "spacing":  "None",
+                                                           "isSubtle":  true
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "verticalContentAlignment":  "Center",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "✅ Setup is correct",
+                                                           "wrap":  true,
+                                                           "weight":  "Bolder",
+                                                           "color":  "Good"
+                                                       }
+                                                   ]
+                                     }
+                                 ]
+                 },
+                 {
+                     "type":  "TextBlock",
+                     "text":  "Executive Summary",
+                     "wrap":  true,
+                     "color":  "Accent",
+                     "weight":  "Bolder",
+                     "spacing":  "Medium"
+                 },
+                 {
+                     "type":  "TextBlock",
+                     "text":  "- Root cause was an incorrect dealer code configured in Inovatec, not a Safe-Guard rating issue.\n- Safe-Guard was able to rate products successfully throughout the investigation.\n- Inovatec corrected the dealer mapping on 9/3 and testing immediately passed.\n- Ghostrider has since sold products, confirming the issue was resolved.\n- One follow-up remains: tell Sam, Zach and Mark the issue is fixed and close the original ticket.",
+                     "wrap":  true,
+                     "spacing":  "Small"
+                 },
+                 {
+                     "type":  "TextBlock",
+                     "text":  "Status",
+                     "wrap":  true,
+                     "color":  "Accent",
+                     "weight":  "Bolder",
+                     "spacing":  "Medium"
+                 },
+                 {
+                     "type":  "ColumnSet",
+                     "spacing":  "Small",
+                     "separator":  true,
+                     "columns":  [
+                                     {
+                                         "type":  "Column",
+                                         "width":  "stretch",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "**Ghostrider**",
+                                                           "wrap":  true,
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "YM900149",
+                                                           "wrap":  true,
+                                                           "size":  "Small",
+                                                           "fontType":  "Monospace"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "✅ Fixed",
+                                                           "wrap":  true,
+                                                           "color":  "Good",
+                                                           "weight":  "Bolder",
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     }
+                                 ]
+                 },
+                 {
+                     "type":  "ColumnSet",
+                     "spacing":  "Small",
+                     "separator":  true,
+                     "columns":  [
+                                     {
+                                         "type":  "Column",
+                                         "width":  "stretch",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "**New Paradigm / Moonlight**",
+                                                           "wrap":  true,
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "YM900187",
+                                                           "wrap":  true,
+                                                           "size":  "Small",
+                                                           "fontType":  "Monospace"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "✅ Working",
+                                                           "wrap":  true,
+                                                           "color":  "Good",
+                                                           "weight":  "Bolder",
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     }
+                                 ]
+                 },
+                 {
+                     "type":  "ColumnSet",
+                     "spacing":  "Small",
+                     "separator":  true,
+                     "columns":  [
+                                     {
+                                         "type":  "Column",
+                                         "width":  "stretch",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "**Lister\u0027s**",
+                                                           "wrap":  true,
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "YM795150",
+                                                           "wrap":  true,
+                                                           "size":  "Small",
+                                                           "fontType":  "Monospace"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "✅ Working",
+                                                           "wrap":  true,
+                                                           "color":  "Good",
+                                                           "weight":  "Bolder",
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     }
+                                 ]
+                 },
+                 {
+                     "type":  "ColumnSet",
+                     "spacing":  "Small",
+                     "separator":  true,
+                     "columns":  [
+                                     {
+                                         "type":  "Column",
+                                         "width":  "stretch",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "**Sport Plein Air Gagnon**",
+                                                           "wrap":  true,
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "YM743310",
+                                                           "wrap":  true,
+                                                           "size":  "Small",
+                                                           "fontType":  "Monospace"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "✅ Working",
+                                                           "wrap":  true,
+                                                           "color":  "Good",
+                                                           "weight":  "Bolder",
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     }
+                                 ]
+                 },
+                 {
+                     "type":  "ColumnSet",
+                     "spacing":  "Small",
+                     "separator":  true,
+                     "columns":  [
+                                     {
+                                         "type":  "Column",
+                                         "width":  "stretch",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "**North Shore**",
+                                                           "wrap":  true,
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "YM795580",
+                                                           "wrap":  true,
+                                                           "size":  "Small",
+                                                           "fontType":  "Monospace"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "✅ Working",
+                                                           "wrap":  true,
+                                                           "color":  "Good",
+                                                           "weight":  "Bolder",
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     }
+                                 ]
+                 },
+                 {
+                     "type":  "ColumnSet",
+                     "spacing":  "Small",
+                     "separator":  true,
+                     "columns":  [
+                                     {
+                                         "type":  "Column",
+                                         "width":  "stretch",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "**Denis Gelinas**",
+                                                           "wrap":  true,
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "YM744350",
+                                                           "wrap":  true,
+                                                           "size":  "Small",
+                                                           "fontType":  "Monospace"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "✅ Working",
+                                                           "wrap":  true,
+                                                           "color":  "Good",
+                                                           "weight":  "Bolder",
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     }
+                                 ]
+                 },
+                 {
+                     "type":  "ColumnSet",
+                     "spacing":  "Small",
+                     "separator":  true,
+                     "columns":  [
+                                     {
+                                         "type":  "Column",
+                                         "width":  "stretch",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "**Dockside**  Enrolled, retest needed",
+                                                           "wrap":  true,
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "YM795710",
+                                                           "wrap":  true,
+                                                           "size":  "Small",
+                                                           "fontType":  "Monospace"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "⚠️ Review",
+                                                           "wrap":  true,
+                                                           "color":  "Warning",
+                                                           "weight":  "Bolder",
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     }
+                                 ]
+                 },
+                 {
+                     "type":  "ColumnSet",
+                     "spacing":  "Small",
+                     "separator":  true,
+                     "columns":  [
+                                     {
+                                         "type":  "Column",
+                                         "width":  "stretch",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "**M\u0026P Mercury**  Not enrolled",
+                                                           "wrap":  true,
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "N/A",
+                                                           "wrap":  true,
+                                                           "size":  "Small",
+                                                           "fontType":  "Monospace"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "⚠️ Review",
+                                                           "wrap":  true,
+                                                           "color":  "Warning",
+                                                           "weight":  "Bolder",
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     }
+                                 ]
+                 },
+                 {
+                     "type":  "ColumnSet",
+                     "spacing":  "Small",
+                     "separator":  true,
+                     "columns":  [
+                                     {
+                                         "type":  "Column",
+                                         "width":  "stretch",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "**Valley Chainsaw**  Still failing - enrolled for Boat DWA only",
+                                                           "wrap":  true,
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "YM795720",
+                                                           "wrap":  true,
+                                                           "size":  "Small",
+                                                           "fontType":  "Monospace"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "❌ Issue",
+                                                           "wrap":  true,
+                                                           "color":  "Attention",
+                                                           "weight":  "Bolder",
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     }
+                                 ]
+                 },
+                 {
+                     "type":  "TextBlock",
+                     "text":  "Next Steps",
+                     "wrap":  true,
+                     "color":  "Accent",
+                     "weight":  "Bolder",
+                     "spacing":  "Medium"
+                 },
+                 {
+                     "type":  "TextBlock",
+                     "text":  "Key question for Account Management",
+                     "wrap":  true,
+                     "size":  "Small",
+                     "spacing":  "Small",
+                     "isSubtle":  true
+                 },
+                 {
+                     "type":  "TextBlock",
+                     "text":  "**Was Valley Chainsaw intentionally enrolled only for Boat DWA, or should they also carry Motorcycle / Powersport products?**",
+                     "wrap":  true,
+                     "spacing":  "None"
+                 },
+                 {
+                     "type":  "TextBlock",
+                     "text":  "1. Notify Sam, Zach and Mark that the Ghostrider dealer-code issue is fixed and close the original ticket.\n2. If Valley Chainsaw should carry powersport products, raise a DCR to add the Powersport DWA and VSC assignments on YM795720.\n3. Retest Dockside (YM795710) now that it is enrolled.",
+                     "wrap":  true,
+                     "spacing":  "Small"
+                 },
+                 {
+                     "type":  "TextBlock",
+                     "text":  "Owner: Account Management (Canada) - confirmation only; no Safe-Guard defect identified",
+                     "wrap":  true,
+                     "size":  "Small",
+                     "isSubtle":  true
+                 },
+                 {
+                     "type":  "ActionSet",
+                     "spacing":  "Medium",
+                     "actions":  [
+                                     {
+                                         "type":  "Action.ToggleVisibility",
+                                         "title":  "🔎 Show investigation details",
+                                         "targetElements":  [
+                                                                "emoryDetails"
+                                                            ]
+                                     }
+                                 ]
+                 },
+                 {
+                     "type":  "Container",
+                     "id":  "emoryDetails",
+                     "isVisible":  false,
+                     "style":  "emphasis",
+                     "spacing":  "Small",
+                     "items":  [
+                                   {
+                                       "type":  "FactSet",
+                                       "facts":  [
+                                                     {
+                                                         "title":  "Dealer",
+                                                         "value":  "Ghostrider (YM900149) and eight other Yamaha / Inovatec dealers"
+                                                     },
+                                                     {
+                                                         "title":  "Product",
+                                                         "value":  "YMBG Boat DWA, YMGP Powersport DWA, APVS Powersport VSC, YMRS Roadside"
+                                                     },
+                                                     {
+                                                         "title":  "Vehicle",
+                                                         "value":  "No VIN - dealer-level setup review"
+                                                     },
+                                                     {
+                                                         "title":  "Source",
+                                                         "value":  "Inovatec / Propel (direct, no aggregator)"
+                                                     },
+                                                     {
+                                                         "title":  "Platform",
+                                                         "value":  "EAS"
+                                                     },
+                                                     {
+                                                         "title":  "Reported",
+                                                         "value":  "Ed Durrant, 09/21/26 - follow-up on the Inovatec dealer-code ticket"
+                                                     }
+                                                 ]
+                                   },
+                                   {
+                                       "type":  "TextBlock",
+                                       "text":  "Checks",
+                                       "wrap":  true,
+                                       "weight":  "Bolder",
+                                       "spacing":  "Medium",
+                                       "size":  "Small"
+                                   },
+                                   {
+                                       "type":  "TextBlock",
+                                       "text":  "1. Dealer status - PASS - all nine codes resolve to active EAS dealers except M\u0026P Mercury (not enrolled)\n2. Product assigned - PASS - YMBG/YMGP/APVS/YMRS open to 9999-12-31 on the eight enrolled codes; Valley Chainsaw carries YMBG only\n3. eContract forms - PASS - YMBDWA-CAN-822 and YMMDWACAN-822 eContract-enabled\n4. Rates - PASS - rate systems 1312/1307/1308/1278 open; RATE_SKU_YAMAHA live rows present\n5. Vehicle eligibility - SKIPPED - no VIN supplied\n0. Duplicate check - NOT checked - no VIN or SR",
+                                       "wrap":  true,
+                                       "size":  "Small",
+                                       "spacing":  "None"
+                                   },
+                                   {
+                                       "type":  "TextBlock",
+                                       "text":  "Root cause",
+                                       "wrap":  true,
+                                       "weight":  "Bolder",
+                                       "spacing":  "Medium",
+                                       "size":  "Small"
+                                   },
+                                   {
+                                       "type":  "TextBlock",
+                                       "text":  "Inovatec had Ghostrider mapped to the wrong Safe-Guard dealer code, so its requests resolved to a shell with no products. Corrected 2026-09-03; DEALER_PRODUCT_CODE for dealer_id 58271 (program 20336) shows APVS/YMBG/YMGP/YMRS open and SG_CON_M1 shows YMRS contracts on 2026-09-01 and 2026-09-07.\n\nValley Chainsaw (YM795720) is correctly mapped but enrolled on YMBG (Boat DWA) only, so any motorcycle/ATV/snowmobile request returns an empty product list: \"No products were available for this dealer.\" That is working as configured, not an API fault.",
+                                       "wrap":  true,
+                                       "size":  "Small",
+                                       "spacing":  "None"
+                                   },
+                                   {
+                                       "type":  "TextBlock",
+                                       "text":  "How this was verified",
+                                       "wrap":  true,
+                                       "weight":  "Bolder",
+                                       "spacing":  "Medium",
+                                       "size":  "Small"
+                                   },
+                                   {
+                                       "type":  "TextBlock",
+                                       "text":  "1. Ghostrider live - DEALER_PRODUCT_CODE for dealer_id 58271 returned 4 open rows (APVS, YMBG, YMGP, YMRS) with EXPIRATION_SALE_DATE 9999-12-31.\n2. Ghostrider transacting - SG_CON_M1 where SG_CON_DEALER = YM900149 returned 2 YMRS contracts, status A, 2026-09-01 and 2026-09-07.\n3. Valley Chainsaw scope - DEALER_PRODUCT_CODE for YM795720 returned a single open row, YMBG; RATE_SYSTEM_APPLICATION shows only rate system 1307.\n4. Working dealers - the six YM codes marked working each returned open product rows and open rate systems for YMBG and YMGP in DEALER_PRODUCT_CODE / RATE_SYSTEM_APPLICATION.\n5. M\u0026P Mercury - no row in V_DEALER for any YM code matching the name; reported to Inovatec as not enrolled.",
+                                       "wrap":  true,
+                                       "isSubtle":  true,
+                                       "spacing":  "None",
+                                       "size":  "Small"
+                                   },
+                                   {
+                                       "type":  "TextBlock",
+                                       "text":  "Classification \u0026 routing",
+                                       "wrap":  true,
+                                       "weight":  "Bolder",
+                                       "spacing":  "Medium",
+                                       "size":  "Small"
+                                   },
+                                   {
+                                       "type":  "FactSet",
+                                       "spacing":  "None",
+                                       "facts":  [
+                                                     {
+                                                         "title":  "I",
+                                                         "value":  "ntegration Partner:** Inovatec (Propel)"
+                                                     },
+                                                     {
+                                                         "title":  "A",
+                                                         "value":  "ggregator:** N/A - direct"
+                                                     },
+                                                     {
+                                                         "title":  "I",
+                                                         "value":  "nquiry Type:** General Inquiry"
+                                                     },
+                                                     {
+                                                         "title":  "I",
+                                                         "value":  "nquiry Sub-Type:** Dealer Setup Verification"
+                                                     },
+                                                     {
+                                                         "title":  "S",
+                                                         "value":  "R Category:** Dealer Setup - EAS"
+                                                     }
+                                                 ]
+                                   }
+                               ]
+                 },
+                 {
+                     "type":  "TextBlock",
+                     "text":  "✅ Setup is correct · Read-only pre-analysis, confirm with the owning team before acting · Emory",
+                     "wrap":  true,
+                     "size":  "Small",
+                     "separator":  true,
+                     "isSubtle":  true
+                 }
+             ]
+}

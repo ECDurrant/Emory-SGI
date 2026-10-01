@@ -119,3 +119,28 @@ OEM Eligibility Matrix · OEMs · General · File Feeds Ingestion - SOP and Docs
   folder right now.** The "OEM Eligibility Matrix" knowledge source here only covers
   5 OEMs (BMW, GM, Honda, Nissan Canada, TFS) as of 2026-08-11; treat it as thin/stale
   until it's refreshed from the master workbook.
+
+---
+
+## Emory as an MCP server (stdio, per-analyst) — added 2026-09-16
+
+Emory also runs as its own MCP server: `Downloads\emory-agent\emory_agent\mcp_server.py`,
+registered as **`emory`** behind the Prompt Security wrapper (`C:\pgmcp\wrapped_servers.json`
+inner definition + pointer in `claude_desktop_config.json`). Any MCP client gets:
+
+| Surface | Purpose |
+|---|---|
+| `emory_investigate(dealer_code, vin?, product_code?, symptom?, sr?)` | the whole headless investigation → rich verdict JSON incl. `verification[]`. Delivers nothing. |
+| `emory_post_verdict(verdict_json, confirm=false)` | renders through `emory_post.ps1`; `confirm=true` posts — **refused** without a valid `verification` array (INC1320603 gate, enforced in code). |
+| `emory_connector_check()` | probes Tier 1/2/3 + delivery wiring. |
+| `emory://skill`, `emory://guardrails`, `emory://reference/{name}` | this brain, read from `~/.claude/skills/emory/` (never vendored). |
+
+Connector facts learned wiring it (apply to any Python-side Snowflake access):
+- Snowflake SSO login is the **UPN** `you@sgintl.com`; role `SDA_ROLE`; warehouse **`SDA_WH`**
+  (`EMORY_WH` does not exist). `STAGING.EAS` has `PROGRAM_VEHICLE_CLASS` (table) but **not** the
+  `V_PROGRAM_VEHICLE_CLASS` view — classing stays Tier 2, as this SOP already says.
+- Python HTTPS on SGI laptops goes through Prompt Security → Zscaler (`HTTPS_PROXY=127.0.0.1:9000`);
+  the Snowflake connector needs the Windows-store roots (`db.ensure_ca_bundle()` handles it).
+- Forte Postgres requires **GlobalProtect** (`vpn.sgintl.com`); on the office LAN alone TCP 5432
+  times out and the interactive `postgresql-mcp` connector fails the same way.
+Full setup: `Downloads\emory-agent\README.md`.

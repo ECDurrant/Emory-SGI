@@ -1,0 +1,88 @@
+{
+  "_comment": "Second sample: a MULTI-DEALER setup review (Yamaha / Inovatec, 2026-09). Exercises `status_rows` (explicit item/id/status/note table) rather than a parsed checks_md, a PASS verdict, and a key question aimed at Account Management. Used by verify_emory.ps1 as the status_rows smoke test. Never posted.",
+  "sr": "Dealer setup check (no SR)",
+  "title": "Yamaha Protection Plan - Inovatec dealer rating status",
+  "dealer": "Ghostrider (YM900149) and eight other Yamaha / Inovatec dealers",
+  "product": "YMBG Boat DWA, YMGP Powersport DWA, APVS Powersport VSC, YMRS Roadside",
+  "sub": "No VIN - dealer-level setup review",
+  "source": "Inovatec / Propel (direct, no aggregator)",
+  "reported": "Ed Durrant, 09/21/26 - follow-up on the Inovatec dealer-code ticket",
+  "platform": "EAS",
+  "verdict": "PASS",
+  "summary": [
+    "Root cause was an incorrect dealer code configured in Inovatec, not a Safe-Guard rating issue.",
+    "Safe-Guard was able to rate products successfully throughout the investigation.",
+    "Inovatec corrected the dealer mapping on 9/3 and testing immediately passed.",
+    "Ghostrider has since sold products, confirming the issue was resolved.",
+    "One follow-up remains: tell Sam, Zach and Mark the issue is fixed and close the original ticket."
+  ],
+  "status_rows": [
+    {
+      "item": "Ghostrider",
+      "id": "YM900149",
+      "status": "fixed"
+    },
+    {
+      "item": "New Paradigm / Moonlight",
+      "id": "YM900187",
+      "status": "working"
+    },
+    {
+      "item": "Lister's",
+      "id": "YM795150",
+      "status": "working"
+    },
+    {
+      "item": "Sport Plein Air Gagnon",
+      "id": "YM743310",
+      "status": "working"
+    },
+    {
+      "item": "North Shore",
+      "id": "YM795580",
+      "status": "working"
+    },
+    {
+      "item": "Denis Gelinas",
+      "id": "YM744350",
+      "status": "working"
+    },
+    {
+      "item": "Dockside",
+      "id": "YM795710",
+      "status": "review",
+      "note": "Enrolled, retest needed"
+    },
+    {
+      "item": "M&P Mercury",
+      "id": "N/A",
+      "status": "review",
+      "note": "Not enrolled"
+    },
+    {
+      "item": "Valley Chainsaw",
+      "id": "YM795720",
+      "status": "fail",
+      "note": "Still failing - enrolled for Boat DWA only"
+    }
+  ],
+  "key_question": "Was Valley Chainsaw intentionally enrolled only for Boat DWA, or should they also carry Motorcycle / Powersport products?",
+  "question_for": "Account Management",
+  "actions": [
+    "Notify Sam, Zach and Mark that the Ghostrider dealer-code issue is fixed and close the original ticket.",
+    "If Valley Chainsaw should carry powersport products, raise a DCR to add the Powersport DWA and VSC assignments on YM795720.",
+    "Retest Dockside (YM795710) now that it is enrolled."
+  ],
+  "owner": "Account Management (Canada) - confirmation only; no Safe-Guard defect identified",
+  "checks_md": "1. Dealer status - PASS - all nine codes resolve to active EAS dealers except M&P Mercury (not enrolled)\n2. Product assigned - PASS - YMBG/YMGP/APVS/YMRS open to 9999-12-31 on the eight enrolled codes; Valley Chainsaw carries YMBG only\n3. eContract forms - PASS - YMBDWA-CAN-822 and YMMDWACAN-822 eContract-enabled\n4. Rates - PASS - rate systems 1312/1307/1308/1278 open; RATE_SKU_YAMAHA live rows present\n5. Vehicle eligibility - SKIPPED - no VIN supplied\n0. Duplicate check - NOT checked - no VIN or SR",
+  "root_cause": "Inovatec had Ghostrider mapped to the wrong Safe-Guard dealer code, so its requests resolved to a shell with no products. Corrected 2026-09-03; DEALER_PRODUCT_CODE for dealer_id 58271 (program 20336) shows APVS/YMBG/YMGP/YMRS open and SG_CON_M1 shows YMRS contracts on 2026-09-01 and 2026-09-07.\n\nValley Chainsaw (YM795720) is correctly mapped but enrolled on YMBG (Boat DWA) only, so any motorcycle/ATV/snowmobile request returns an empty product list: \"No products were available for this dealer.\" That is working as configured, not an API fault.",
+  "verification": [
+    "Ghostrider live - DEALER_PRODUCT_CODE for dealer_id 58271 returned 4 open rows (APVS, YMBG, YMGP, YMRS) with EXPIRATION_SALE_DATE 9999-12-31.",
+    "Ghostrider transacting - SG_CON_M1 where SG_CON_DEALER = YM900149 returned 2 YMRS contracts, status A, 2026-09-01 and 2026-09-07.",
+    "Valley Chainsaw scope - DEALER_PRODUCT_CODE for YM795720 returned a single open row, YMBG; RATE_SYSTEM_APPLICATION shows only rate system 1307.",
+    "Working dealers - the six YM codes marked working each returned open product rows and open rate systems for YMBG and YMGP in DEALER_PRODUCT_CODE / RATE_SYSTEM_APPLICATION.",
+    "M&P Mercury - no row in V_DEALER for any YM code matching the name; reported to Inovatec as not enrolled."
+  ],
+  "classification": "**Integration Partner:** Inovatec (Propel)\n**Aggregator:** N/A - direct\n**Inquiry Type:** General Inquiry\n**Inquiry Sub-Type:** Dealer Setup Verification\n**SR Category:** Dealer Setup - EAS",
+  "pattern": "Dealer mapping"
+}

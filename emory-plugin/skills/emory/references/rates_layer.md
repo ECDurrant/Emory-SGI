@@ -35,15 +35,19 @@ WHERE (rsa.DEALER_ID = {dealer_id} OR rsa.DEALER_ID IS NULL)   -- assignment can
 No row at all = **Rate System Missing (RC#4)** → Rates & Forms. (Some carriers, e.g. MOPAR,
 assign at `AGENT_ID` level — widen the filter with the dealer's agent before concluding a gap.)
 
-**5b. Rate SKU rows exist?** — use `STAGING.EMORY.V_RATE_SKU_ALL` (the union of the
-replicated carrier tables; see `EMORY_SNOWFLAKE_LAYER.sql`). Until that view is
-deployed, query the carrier table directly (`RATE_SKU_VCI` / `_BMW` / `_TFS` /
-`_FFUN` / `_ONEPROTECT`):
+**5b. Rates exist for the sale date?** — EAS prices **two ways**, and a program can use both.
+Pick the path from `references/routing.md` §2 (program → rate source; verified 2026-10-01).
+Checking only the RATE_SKU table for a PRICE_HEADER program (Mazda, RPM, Fuel Capital,
+Rolls-Royce, Cover My Car, SG US …) reports a false "no rates".
+
+**5b-i — RATE_SKU path** (per-program table; Snowflake unless the program is SG Agents 20376,
+Lithia 20389 or QualityGuard 20273 → SQL Server `dbo.Rate_sku_SG_Agents` /
+`dbo.RATE_SKU_LITHIA_NVR` / `dbo.RATE_SKU_NISSAN_CA`, not replicated):
 ```sql
 SELECT CLASS, TERM_FROM, TERM_TO, ODOMETER_FROM, ODOMETER_TO,
        VEHICLE_CONDITION, START_SALE_DATE, END_SALE_DATE,
        DEALER_COST, RETAIL_COST
-FROM STAGING.EAS.RATE_SKU_VCI
+FROM STAGING.EAS.RATE_SKU_VCI          -- swap for the program's table: routing.md §2
 WHERE PROGRAM_ID = {program_id} AND PRODUCT_CODE_ID = {product_code_id}
   AND RATE_SYSTEM_ID = {rate_system_id}
   AND ('{as_of}' BETWEEN START_SALE_DATE AND END_SALE_DATE)
@@ -53,6 +57,35 @@ LIMIT 50;
 > **RATE_SKU gotcha:** `MSRP_FROM/TO`, `VEHICLE_CONDITION`, engine ranges are often
 > BLANK/NULL (= unrestricted) — a `BETWEEN` on them silently excludes everything.
 > Filter only on `CLASS`, sale-date window, term, odometer.
+
+**5b-ii — PRICE_HEADER path** (`PRODUCT_PLAN → PRODUCT_PLAN_SKU → PRODUCT_PLAN_SKU_PRICE_HEADER`,
+keyed by rate system, own sale window). One row per rate system the dealer can use:
+```sql
+WITH p AS (SELECT '{code}' code, '{product}' product, CURRENT_DATE as_of),
+x AS (SELECT v.DEALER_ID, rpc.PRODUCT_CODE_ID, rpc.PROGRAM_ID
+      FROM p JOIN STAGING.EAS.V_DEALER v ON v.CMS_DEALER_NUMBER = p.code
+      JOIN STAGING.EAS.REF_PRODUCT_CODE rpc ON rpc.PRODUCT_CODE = p.product AND rpc.PROGRAM_ID = v.PROGRAM_ID),
+rs AS (SELECT DISTINCT rsa.RATE_SYSTEM_ID, rs.NAME
+       FROM x JOIN STAGING.EAS.RATE_SYSTEM rs ON rs.PROGRAM_ID = x.PROGRAM_ID AND rs.PRODUCT_CODE_ID = x.PRODUCT_CODE_ID
+       JOIN STAGING.EAS.RATE_SYSTEM_APPLICATION rsa ON rsa.RATE_SYSTEM_ID = rs.RATE_SYSTEM_ID
+        AND (rsa.DEALER_ID = x.DEALER_ID OR rsa.DEALER_ID IS NULL) AND rsa.PROGRAM_ID = x.PROGRAM_ID)
+SELECT rs.RATE_SYSTEM_ID, rs.NAME,
+       COUNT(DISTINCT pp.PRODUCT_PLAN_ID) plans, COUNT(DISTINCT s.PRODUCT_PLAN_SKU_ID) skus,
+       COUNT(DISTINCT CASE WHEN (SELECT as_of FROM p) BETWEEN h.SALES_EFFECTIVE_DATE AND h.SALES_EXPIRATION_DATE
+                           THEN h.PRODUCT_PLAN_SKU_PRICE_HEADER_ID END) active_price_headers,
+       MAX(h.SALES_EXPIRATION_DATE) last_header_exp
+FROM rs JOIN x ON 1 = 1
+JOIN STAGING.EAS.PRODUCT_PLAN pp     ON pp.PROGRAM_ID = x.PROGRAM_ID AND pp.PRODUCT_CODE_ID = x.PRODUCT_CODE_ID
+JOIN STAGING.EAS.PRODUCT_PLAN_SKU s  ON s.PRODUCT_PLAN_ID = pp.PRODUCT_PLAN_ID
+LEFT JOIN STAGING.EAS.PRODUCT_PLAN_SKU_PRICE_HEADER h
+       ON h.PRODUCT_PLAN_SKU_ID = s.PRODUCT_PLAN_SKU_ID AND h.RATE_SYSTEM_ID = rs.RATE_SYSTEM_ID
+GROUP BY 1, 2 ORDER BY active_price_headers DESC;
+```
+Verified 2026-10-01: `MAZ42024` + `MZSP` → rate system 679 "MZSP NATL VSC TMIS", 1 plan, 8 SKUs,
+**49 active price headers**. `active_price_headers = 0` with a past `last_header_exp` = prices
+expired (e.g. BMW/MINI Canada 20296 — every header ended 2022-12-31 while 87 dealers stay
+enrolled; gap G6) → Rates & Forms. Amounts are in `PRODUCT_PLAN_SKU_PRICE` (284M rows) — only
+open it for a specific `PRODUCT_PLAN_SKU_PRICE_HEADER_ID`.
 
 > **⚠ NEVER guess the rate-table name from the product code.** Added 2026-08-24 (INC1316449)
 > after a first pass invented `dbo.RATE_SKU_SVSC` / `dbo.RATE_SKU_SGPC` — **neither exists**, the
@@ -208,7 +241,7 @@ a confirmation step, not a substitute, and it's a last-mile check, not a first m
   anywhere shared); treat it with the same care as the Postman collections it was sourced
   from.
 
-**Legacy rates:** the dealer→rate-system link is `SG_DRS_M1` (`SG_DRS_DEALER` → `SG_DRS_RS`);
+**Legacy rates** (the fixed, verified query is L1 in `legacy_forte.md` — use that): the dealer→rate-system link is `SG_DRS_M1` (`SG_DRS_DEALER` → `SG_DRS_RS`);
 join it to the schedule master `STAGING.CMS.SG_RSC_M1` on `SG_DRS_RS = SG_RSC_RS` (`SG_RSC_RS` =
 rate system, `SG_RSC_PLC`, `SG_RSC_CARRIER`, `SG_RSC_SDATE/EDATE`, `SG_RSC_METHOD`,
 `SG_RSC_BASERATE`), tiers `SG_RSC_D1/D2/D3`. Forms: `SG_FORM_M1` keyed by `SG_FORM_PLC` +

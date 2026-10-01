@@ -1,5 +1,5 @@
 <#
-    Setup-SGI-MCP.ps1   (v2)
+    Setup-SGI-MCP.ps1   (v2.1)
 
     One-shot, unattended setup of Safe-Guard's read-only database MCP servers
     for Claude Desktop, behind the Prompt Security DLP wrapper.
@@ -7,6 +7,10 @@
     Configures: postgresql-mcp (Forte), sqlserver (SGEAS), mongodb-gm (Atlas),
                 and preserves any existing github / ms365 entries.
                 Snowflake has a ready-to-fill slot - see SNOWFLAKE below.
+                -WithEmory (v2.1) also installs the Emory MCP server: copies the
+                emory-agent code, builds its own venv, writes a per-user .env,
+                registers it behind the wrapper and installs the claude-CLI
+                login keep-alive task. Idempotent; never overwrites an existing .env.
 
     WHY v2 EXISTS
     -------------
@@ -38,6 +42,13 @@
       Self-healing (re-asserts config at every logon; idempotent, fast no-op):
         .\Setup-SGI-MCP.ps1 -RegisterLogonTask
 
+      Emory MCP for an API-support analyst (source = the emory-agent folder
+      shipped next to this script, or -EmorySource <path>):
+        .\Setup-SGI-MCP.ps1 -WithEmory
+      Also re-asserts the Emory pointer at logon (Claude Desktop drops entries
+      added while it is running unless it is restarted):
+        .\Setup-SGI-MCP.ps1 -WithEmory -RegisterLogonTask
+
     EXIT CODES
       0 = configured, handshake verified
       2 = configured, but a server failed the handshake self-test
@@ -53,6 +64,11 @@ param(
     [switch]   $SkipDeps,
     [switch]   $NoSelfTest,
     [switch]   $RegisterLogonTask,
+    # Emory MCP server (see header). Source defaults to <script dir>\emory-agent,
+    # then %USERPROFILE%\Downloads\emory-agent. Dest is where it runs from.
+    [switch]   $WithEmory,
+    [string]   $EmorySource = "",
+    [string]   $EmoryDest   = (Join-Path $env:USERPROFILE "emory-agent"),
     # Writes the sidecar and Claude config into a throwaway folder and prints
     # them, touching nothing real. Validate here before any rollout.
     [switch]   $DryRun
@@ -85,7 +101,7 @@ function Write-Utf8NoBom {
     [System.IO.File]::WriteAllText($Path, $Text, $enc)
 }
 
-Say "Setup-SGI-MCP v2 starting for user '$SgiUser'" "STEP"
+Say "Setup-SGI-MCP v2.1 starting for user '$SgiUser'" "STEP"
 Say "Log file: $logFile"
 
 # ------------------------------------------------- optional: logon task ------
@@ -162,11 +178,19 @@ if ($wantMongo) {
 
 # ------------------------------------------------------------ dependencies ---
 if (-not $SkipDeps) {
-    Say "Installing Python dependencies (mcp, psycopg2-binary, pyodbc) ..." "STEP"
-    & $PY -m pip install --upgrade --quiet mcp psycopg2-binary pyodbc 2>&1 | ForEach-Object { Say $_ }
+    Say "Installing Python dependencies (mcp<2, psycopg2-binary, pyodbc) ..." "STEP"
+    # Two fixes (v2.1): (1) pin mcp<2 - the connector scripts import mcp.server.fastmcp,
+    # which mcp 2.x renamed; an unpinned --upgrade would break sqlserver/postgresql-mcp on
+    # the next restart. (2) run pip through cmd so its stderr chatter (pip's own upgrade
+    # notice, wheel warnings) cannot become a terminating NativeCommandError under
+    # $ErrorActionPreference = Stop - which is how a healthy install died silently before.
+    $pipPkgs = '"mcp<2" psycopg2-binary pyodbc'
+    $pipOut = & cmd /c "`"$PY`" -m pip install --upgrade --quiet $pipPkgs 2>&1"
+    $pipOut | ForEach-Object { Say $_ }
     if ($LASTEXITCODE -ne 0) {
         Say "Machine-wide pip install failed (likely no admin) - retrying with --user" "WARN"
-        & $PY -m pip install --upgrade --user --quiet mcp psycopg2-binary pyodbc 2>&1 | ForEach-Object { Say $_ }
+        $pipOut = & cmd /c "`"$PY`" -m pip install --upgrade --user --quiet $pipPkgs 2>&1"
+        $pipOut | ForEach-Object { Say $_ }
         if ($LASTEXITCODE -ne 0) { Say "pip install failed - see log." "FAIL"; exit 3 }
     }
     Say "Python dependencies OK" "OK"
@@ -187,6 +211,119 @@ if (-not $SkipDeps) {
     }
 } else {
     Say "Skipping dependency install (-SkipDeps)" "WARN"
+}
+
+# ---------------------------------------------------------- Emory MCP -------
+$EMORY_PY = ""; $EMORY_SKILL = ""
+if ($WithEmory) {
+    if ($Servers -notcontains "emory") { $Servers = @($Servers) + "emory" }
+    Say "Setting up the Emory MCP server ..." "STEP"
+
+    # emory-agent needs Python 3.11+ (claude-agent-sdk, mcp 1.x)
+    $pyMinor = [int]($pyVer.Split(".")[1])
+    if ($pyMinor -lt 11) { Say "Emory needs Python 3.11+ (found $pyVer). Install 3.13 and re-run." "FAIL"; exit 3 }
+
+    # 1. locate source
+    if (-not $EmorySource) {
+        foreach ($cand in @((Join-Path $PSScriptRoot "emory-agent"),
+                            (Join-Path $env:USERPROFILE "Downloads\emory-agent"))) {
+            if (Test-Path (Join-Path $cand "emory_agent\mcp_server.py")) { $EmorySource = $cand; break }
+        }
+    }
+    if (-not $EmorySource -or -not (Test-Path (Join-Path $EmorySource "emory_agent\mcp_server.py"))) {
+        Say "emory-agent source not found (looked next to this script and in Downloads). Pass -EmorySource <folder>." "FAIL"; exit 3
+    }
+    Say "Emory source    : $EmorySource" "OK"
+
+    # 2. copy code to dest (code only - never .env, .venv or caches); skip when source == dest
+    $srcFull = (Resolve-Path $EmorySource).Path.TrimEnd('\')
+    $dstFull = [System.IO.Path]::GetFullPath($EmoryDest).TrimEnd('\')
+    $EmoryDest = $dstFull
+    if ($srcFull -ieq $dstFull) {
+        Say "Emory dest = source; using it in place" "OK"
+    } elseif (-not $DryRun) {
+        New-Item -ItemType Directory -Path $dstFull -Force | Out-Null
+        & robocopy $srcFull $dstFull /E /XD .venv __pycache__ .git /XF .env "*.log" /NFL /NDL /NJH /NJS /NP | Out-Null
+        if ($LASTEXITCODE -ge 8) { Say "robocopy failed (rc=$LASTEXITCODE) copying emory-agent" "FAIL"; exit 3 }
+        Say "Emory code copied -> $dstFull" "OK"
+    } else {
+        Say "DRY RUN - would copy $srcFull -> $dstFull" "WARN"
+    }
+
+    # 3. venv + requirements
+    $EMORY_PY = Join-Path $dstFull ".venv\Scripts\python.exe"
+    if (-not $DryRun) {
+        if (-not (Test-Path $EMORY_PY)) {
+            Say "Creating Emory venv with $PY ..." "STEP"
+            & cmd /c "`"$PY`" -m venv `"$(Join-Path $dstFull '.venv')`" 2>&1" | ForEach-Object { Say $_ }
+            if (-not (Test-Path $EMORY_PY)) { Say "venv creation failed" "FAIL"; exit 3 }
+        }
+        if (-not $SkipDeps) {
+            Say "Installing Emory requirements (claude-agent-sdk, mcp, DB drivers) ..." "STEP"
+            $req = Join-Path $dstFull "requirements.txt"
+            & cmd /c "`"$EMORY_PY`" -m pip install --quiet --upgrade pip 2>&1" | Out-Null
+            $pipOut = & cmd /c "`"$EMORY_PY`" -m pip install --quiet -r `"$req`" 2>&1"
+            $pipOut | ForEach-Object { Say $_ }
+            if ($LASTEXITCODE -ne 0) { Say "Emory pip install failed - see log." "FAIL"; exit 3 }
+            & cmd /c "`"$EMORY_PY`" -m pip install --quiet `"snowflake-connector-python[secure-local-storage]`" 2>&1" | Out-Null
+        }
+        Say "Emory venv ready: $EMORY_PY" "OK"
+    }
+
+    # 4. canonical brain: the skill must exist for this user
+    $EMORY_SKILL = Join-Path $env:USERPROFILE ".claude\skills\emory\SKILL.md"
+    if (-not (Test-Path $EMORY_SKILL)) {
+        $pluginSkill = @((Join-Path $PSScriptRoot "emory-plugin\skills\emory"),
+                         (Join-Path $env:USERPROFILE "Downloads\emory-plugin\skills\emory")) |
+                       Where-Object { Test-Path (Join-Path $_ "SKILL.md") } | Select-Object -First 1
+        if ($pluginSkill -and -not $DryRun) {
+            New-Item -ItemType Directory -Path (Split-Path $EMORY_SKILL) -Force | Out-Null
+            & robocopy $pluginSkill (Split-Path $EMORY_SKILL) /E /XF "secrets.json" /NFL /NDL /NJH /NJS /NP | Out-Null
+            Say "Emory skill installed from plugin -> $(Split-Path $EMORY_SKILL)" "OK"
+        } else {
+            Say "Emory skill not found at $EMORY_SKILL - install the emory plugin/skill first; the MCP refuses to start without it." "WARN"
+        }
+    } else { Say "Emory skill present : $EMORY_SKILL" "OK" }
+
+    # 5. per-user .env - written once, never overwritten
+    $envPath = Join-Path $dstFull ".env"
+    if (Test-Path $envPath) {
+        Say "Emory .env already exists - left untouched" "OK"
+    } elseif (-not $DryRun) {
+        $rand = { param($n) $b = New-Object byte[] ($n * 2); [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); (([Convert]::ToBase64String($b)) -replace '[^A-Za-z0-9]','').Substring(0, $n) }
+        $urlFile = Join-Path $env:USERPROFILE "Downloads\emory_verdict_delivery_url.txt"
+        $envText = @(
+            "# Emory Agent - generated by Setup-SGI-MCP.ps1 for $SgiUser on $(Get-Date -Format 'yyyy-MM-dd'). Your own identity; no shared passwords.",
+            "EMORY_SKILL_PATH=$EMORY_SKILL",
+            "EMORY_MAX_TURNS=60",
+            "EMORY_SHARED_SECRET=$(& $rand 40)",
+            "EMORY_DELIVERY_URL_FILE=$urlFile",
+            "EMORY_AUTOPOST=off",
+            "",
+            "SNOWFLAKE_ACCOUNT=GQA62108",
+            "SNOWFLAKE_USER=$SgiUser@sgintl.com",
+            "SNOWFLAKE_AUTHENTICATOR=externalbrowser",
+            "SNOWFLAKE_WAREHOUSE=SDA_WH",
+            "SNOWFLAKE_DATABASE=STAGING",
+            "",
+            "SQLSERVER_HOST=QTSPRODEASDB3",
+            "SQLSERVER_DATABASE=SGEAS_DIFF",
+            "ODBC_DRIVER=ODBC Driver 18 for SQL Server",
+            "",
+            "PGHOST=awsprodpgforte-3.cmrjwlo0vmya.us-east-1.sgintlnet.com",
+            "PGPORT=5432",
+            "PGDATABASE=forte",
+            "PGUSER=$SgiUser@ETCH.COM",
+            "",
+            "# HTTP transport (only if this machine hosts the SIA pilot): python -m emory_agent.http_server",
+            "EMORY_HTTP_TOKEN=$(& $rand 43)",
+            "EMORY_HTTP_HOST=127.0.0.1",
+            "EMORY_HTTP_PORT=8790"
+        ) -join "`n"
+        Write-Utf8NoBom -Path $envPath -Text $envText
+        Say "Emory .env written (Snowflake user $SgiUser@sgintl.com, Forte user $SgiUser@ETCH.COM)" "OK"
+        if (-not (Test-Path $urlFile)) { Say "Teams delivery URL file not present ($urlFile) - posting to Teams stays disabled until the analyst receives it (it is a secret, not shipped)." "WARN" }
+    } else { Say "DRY RUN - would write $envPath" "WARN" }
 }
 
 # ---------------------------------------------- deploy inner server scripts --
@@ -406,6 +543,11 @@ managed   = [s for s in sys.argv[4].split(",") if s]
 SIDECAR   = sys.argv[5]          # passed in so -DryRun can redirect it
 CFG       = sys.argv[6]
 pg_script = sys.argv[7]
+emory_py    = sys.argv[8]  if len(sys.argv) > 8  else ""
+emory_root  = sys.argv[9]  if len(sys.argv) > 9  else ""
+emory_skill = sys.argv[10] if len(sys.argv) > 10 else ""
+# "-" is the placeholder the PowerShell side sends for an empty value (see ArgOrDash)
+node_exe, emory_py, emory_root, emory_skill = [("" if v == "-" else v) for v in (node_exe, emory_py, emory_root, emory_skill)]
 
 appdata = os.environ["APPDATA"]
 profile = os.environ["USERPROFILE"]
@@ -454,6 +596,18 @@ DEFS = {
             "MDB_MCP_CONNECTION_STRING":
                 "mongodb+srv://sg-prod-mg-atlas-clst-pl-0.13qes8.mongodb.net/"
                 "?authSource=$external&authMechanism=MONGODB-OIDC",
+        },
+    },
+
+    # ------------------------------------------------ EMORY (-WithEmory) -----
+    "emory": {
+        "command": emory_py,
+        "args": ["-m", "emory_agent.mcp_server"],
+        "env": {
+            "PYTHONPATH": emory_root,
+            "PYTHONUTF8": "1",
+            "PYTHONIOENCODING": "utf-8",
+            "EMORY_SKILL_PATH": emory_skill,
         },
     },
 
@@ -528,6 +682,9 @@ for name in managed:
     if name not in DEFS:
         print("WARN no definition for '%s' - skipped" % name)
         continue
+    if name == "emory" and not emory_py:
+        print("WARN emory requested without -WithEmory - skipped")
+        continue
     side["mcpServers"][name] = {
         "command": WRAPPER,
         "args": [SIDECAR, name],
@@ -592,7 +749,12 @@ if ($DryRun) {
 }
 
 Say "Writing sidecar + Claude Desktop config (managed: $serverList) ..." "STEP"
-& $PY $genPath $SgiUser $PY $NODE $serverList $effSidecar $claudeCfg $pgScriptPath 2>&1 | ForEach-Object { Say $_ }
+# every arg quoted: an EMPTY $NODE (no mongodb-gm on this run) must still occupy its
+# position, otherwise every later argument shifts left by one
+# PowerShell 5.1 silently DROPS empty-string arguments to native programs, so an
+# unset $NODE / $EMORY_* would shift every later argument left. Send "-" for empty.
+function ArgOrDash([string]$v) { if ([string]::IsNullOrEmpty($v)) { "-" } else { $v } }
+& $PY $genPath (ArgOrDash $SgiUser) (ArgOrDash $PY) (ArgOrDash $NODE) (ArgOrDash $serverList) (ArgOrDash $effSidecar) (ArgOrDash $claudeCfg) (ArgOrDash $pgScriptPath) (ArgOrDash $EMORY_PY) (ArgOrDash $EmoryDest) (ArgOrDash $EMORY_SKILL) 2>&1 | ForEach-Object { Say $_ }
 if ($LASTEXITCODE -ne 0) { Say "Config generation failed - see log." "FAIL"; exit 3 }
 Say "Config written" "OK"
 
@@ -603,6 +765,19 @@ if ($DryRun) {
     Get-Content $claudeCfg | ForEach-Object { Say $_ }
     Say "DRY RUN complete - no real file was changed. Sandbox: $sandbox" "OK"
     exit 0
+}
+
+# ------------------------------------------- Emory: claude-CLI keep-alive ----
+if ($WithEmory -and -not $DryRun) {
+    $ka = Join-Path $EmoryDest "setup\Register-ClaudeAuthKeepalive.ps1"
+    if (Test-Path $ka) {
+        Say "Registering the claude-CLI login keep-alive task ..." "STEP"
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $ka 2>&1 | ForEach-Object { Say $_ }
+    } else { Say "keep-alive script not found at $ka - skipped" "WARN" }
+    $authOk = $false
+    try { $st = (& claude auth status 2>$null | Out-String); $authOk = ($st -match '"loggedIn":\s*true') } catch { }
+    if ($authOk) { Say "claude CLI is signed in (Emory's reasoning runtime rides this login)" "OK" }
+    else { Say "claude CLI is NOT signed in - run 'claude auth login' once, or emory_investigate will fail with 401." "WARN" }
 }
 
 # ------------------------------------------------------------- self-test -----
@@ -741,6 +916,11 @@ if ($NODE) { Say "Node            : $NODE" }
 Say "Sidecar         : $effSidecar   <- inner definitions (Claude never rewrites this)"
 Say "Claude config   : $claudeCfg   <- pointers only, no 'server' key"
 Say "Managed servers : $serverList"
+if ($WithEmory) {
+    Say "Emory code      : $EmoryDest   (.env is per-user; venv inside)"
+    Say "Emory brain     : $EMORY_SKILL"
+    Say "Emory tools     : emory_investigate, emory_post_verdict, emory_eligibility_lookup, emory_connector_check"
+}
 Say "Log             : $logFile"
 
 $odbc = (& $PY -c "import pyodbc;print('ODBC Driver 18 for SQL Server' in pyodbc.drivers())" 2>$null)

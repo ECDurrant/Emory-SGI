@@ -1,0 +1,528 @@
+﻿{
+    "type":  "AdaptiveCard",
+    "$schema":  "http://adaptivecards.io/schemas/adaptive-card.json",
+    "version":  "1.4",
+    "msteams":  {
+                    "width":  "Full"
+                },
+    "body":  [
+                 {
+                     "type":  "ColumnSet",
+                     "columns":  [
+                                     {
+                                         "type":  "Column",
+                                         "width":  "stretch",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "🔎 Emory Case Review",
+                                                           "wrap":  true,
+                                                           "weight":  "Bolder",
+                                                           "size":  "Medium"
+                                                       },
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "**INC1322003** · Audi Tri-Cities - GAP not rating; QualityProtect Term/VSC excluded on Audi",
+                                                           "wrap":  true,
+                                                           "size":  "Small",
+                                                           "spacing":  "None",
+                                                           "isSubtle":  true
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "verticalContentAlignment":  "Center",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "❌ Setup issue found",
+                                                           "wrap":  true,
+                                                           "weight":  "Bolder",
+                                                           "color":  "Attention"
+                                                       }
+                                                   ]
+                                     }
+                                 ]
+                 },
+                 {
+                     "type":  "TextBlock",
+                     "text":  "Executive Summary",
+                     "wrap":  true,
+                     "color":  "Accent",
+                     "weight":  "Bolder",
+                     "spacing":  "Medium"
+                 },
+                 {
+                     "type":  "TextBlock",
+                     "text":  "- The dealer was set up on 9/21 with 21 Audi products, but only 19 were given rates.\n- The two missing ones are both Pure Protection GAP products, which is why GAP returns nothing.\n- QualityProtect Term and VSC are meant for non-Audi vehicles, so they are excluded on this car by design.\n- The Audi versions of those products (AU Term, AU Term Plus, Audi VSP) already rate on the same request.",
+                     "wrap":  true,
+                     "spacing":  "Small"
+                 },
+                 {
+                     "type":  "TextBlock",
+                     "text":  "Status",
+                     "wrap":  true,
+                     "color":  "Accent",
+                     "weight":  "Bolder",
+                     "spacing":  "Medium"
+                 },
+                 {
+                     "type":  "ColumnSet",
+                     "spacing":  "Small",
+                     "separator":  true,
+                     "columns":  [
+                                     {
+                                         "type":  "Column",
+                                         "width":  "stretch",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "**contract**  PASS - no contract on this VIN in Legacy, EAS or RoadRunner",
+                                                           "wrap":  true,
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "⚠️ Review",
+                                                           "wrap":  true,
+                                                           "color":  "Warning",
+                                                           "weight":  "Bolder",
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     }
+                                 ]
+                 },
+                 {
+                     "type":  "ColumnSet",
+                     "spacing":  "Small",
+                     "separator":  true,
+                     "columns":  [
+                                     {
+                                         "type":  "Column",
+                                         "width":  "stretch",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "**Dealer**  dealer 63237 active, 21 program-20285 products assigned 9/21/26 to 9999-12-31",
+                                                           "wrap":  true,
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "✅ OK",
+                                                           "wrap":  true,
+                                                           "color":  "Good",
+                                                           "weight":  "Bolder",
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     }
+                                 ]
+                 },
+                 {
+                     "type":  "ColumnSet",
+                     "spacing":  "Small",
+                     "separator":  true,
+                     "columns":  [
+                                     {
+                                         "type":  "Column",
+                                         "width":  "stretch",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "**Product**  AUGP, AUPL, QPTR, QPVS all assigned and open",
+                                                           "wrap":  true,
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "✅ OK",
+                                                           "wrap":  true,
+                                                           "color":  "Good",
+                                                           "weight":  "Bolder",
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     }
+                                 ]
+                 },
+                 {
+                     "type":  "ColumnSet",
+                     "spacing":  "Small",
+                     "separator":  true,
+                     "columns":  [
+                                     {
+                                         "type":  "Column",
+                                         "width":  "stretch",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "**Rate system**  AUGP and AUPL have no rate system; the other 19 products do",
+                                                           "wrap":  true,
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "❌ Issue",
+                                                           "wrap":  true,
+                                                           "color":  "Attention",
+                                                           "weight":  "Bolder",
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     }
+                                 ]
+                 },
+                 {
+                     "type":  "ColumnSet",
+                     "spacing":  "Small",
+                     "separator":  true,
+                     "columns":  [
+                                     {
+                                         "type":  "Column",
+                                         "width":  "stretch",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "**Rate SKU**  AUGP WA / AUPL WA each have 24 active rows covering 12-96 months",
+                                                           "wrap":  true,
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "✅ OK",
+                                                           "wrap":  true,
+                                                           "color":  "Good",
+                                                           "weight":  "Bolder",
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     }
+                                 ]
+                 },
+                 {
+                     "type":  "ColumnSet",
+                     "spacing":  "Small",
+                     "separator":  true,
+                     "columns":  [
+                                     {
+                                         "type":  "Column",
+                                         "width":  "stretch",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "**Classing**  QPTR/QPTS carry AUDI ALL MODELS EXCLUDED since 2020-01-22; QPVS has no active Audi class (by design)",
+                                                           "wrap":  true,
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "✅ OK",
+                                                           "wrap":  true,
+                                                           "color":  "Good",
+                                                           "weight":  "Bolder",
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     }
+                                 ]
+                 },
+                 {
+                     "type":  "ColumnSet",
+                     "spacing":  "Small",
+                     "separator":  true,
+                     "columns":  [
+                                     {
+                                         "type":  "Column",
+                                         "width":  "stretch",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "**Eligibility rule**  QualityProtect Ops Manual v7 p.9/p.20: QP VSP and Term cover competitive (non-Audi) makes only",
+                                                           "wrap":  true,
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "✅ OK",
+                                                           "wrap":  true,
+                                                           "color":  "Good",
+                                                           "weight":  "Bolder",
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     }
+                                 ]
+                 },
+                 {
+                     "type":  "ColumnSet",
+                     "spacing":  "Small",
+                     "separator":  true,
+                     "columns":  [
+                                     {
+                                         "type":  "Column",
+                                         "width":  "stretch",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "**Request payload**  200 SUCCESS, 10 Audi products returned incl. AUTR, AUTS, AUVS; no GAP, QPTR or QPVS",
+                                                           "wrap":  true,
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "✅ OK",
+                                                           "wrap":  true,
+                                                           "color":  "Good",
+                                                           "weight":  "Bolder",
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     }
+                                 ]
+                 },
+                 {
+                     "type":  "ColumnSet",
+                     "spacing":  "Small",
+                     "separator":  true,
+                     "columns":  [
+                                     {
+                                         "type":  "Column",
+                                         "width":  "stretch",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "**SR dedup**  Salesforce not searched this run; pattern library already links this INC to SR00417906",
+                                                           "wrap":  true,
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     },
+                                     {
+                                         "type":  "Column",
+                                         "width":  "auto",
+                                         "items":  [
+                                                       {
+                                                           "type":  "TextBlock",
+                                                           "text":  "⏭️ Skipped",
+                                                           "wrap":  true,
+                                                           "color":  "Default",
+                                                           "weight":  "Bolder",
+                                                           "size":  "Small"
+                                                       }
+                                                   ]
+                                     }
+                                 ]
+                 },
+                 {
+                     "type":  "TextBlock",
+                     "text":  "Next Steps",
+                     "wrap":  true,
+                     "color":  "Accent",
+                     "weight":  "Bolder",
+                     "spacing":  "Medium"
+                 },
+                 {
+                     "type":  "TextBlock",
+                     "text":  "Key question for Rates \u0026 Forms",
+                     "wrap":  true,
+                     "size":  "Small",
+                     "spacing":  "Small",
+                     "isSubtle":  true
+                 },
+                 {
+                     "type":  "TextBlock",
+                     "text":  "**Should Audi Tri-Cities get the Washington GAP rate systems (AUGP WA / AUPL WA) like the other WA Audi dealers, rather than the national ones?**",
+                     "wrap":  true,
+                     "spacing":  "None"
+                 },
+                 {
+                     "type":  "TextBlock",
+                     "text":  "1. **Rates \u0026 Forms** - apply AUGP WA and AUPL WA to dealer AU423D75 effective 9/21/26.\n2. **IT Client Support** - tell PEN GAP will rate after the fix and to quote AU Term/VSP instead of QP on Audi.",
+                     "wrap":  true,
+                     "spacing":  "Small"
+                 },
+                 {
+                     "type":  "TextBlock",
+                     "text":  "Owner: Rates \u0026 Forms",
+                     "wrap":  true,
+                     "size":  "Small",
+                     "isSubtle":  true
+                 },
+                 {
+                     "type":  "ActionSet",
+                     "spacing":  "Medium",
+                     "actions":  [
+                                     {
+                                         "type":  "Action.ToggleVisibility",
+                                         "title":  "🔎 Show investigation details",
+                                         "targetElements":  [
+                                                                "emoryDetails"
+                                                            ]
+                                     }
+                                 ]
+                 },
+                 {
+                     "type":  "Container",
+                     "id":  "emoryDetails",
+                     "isVisible":  false,
+                     "style":  "emphasis",
+                     "spacing":  "Small",
+                     "items":  [
+                                   {
+                                       "type":  "FactSet",
+                                       "facts":  [
+                                                     {
+                                                         "title":  "Dealer",
+                                                         "value":  "Audi Tri-Cities (AU423D75, EAS dealer 63237)"
+                                                     },
+                                                     {
+                                                         "title":  "Product",
+                                                         "value":  "AUGP/AUPL Pure Protection GAP, QPTR QP Term, QPVS QP VSC"
+                                                     },
+                                                     {
+                                                         "title":  "Vehicle",
+                                                         "value":  "2026 Audi SQ5 Premium Plus - VIN WA125AGU6T2021477 - New, Finance"
+                                                     },
+                                                     {
+                                                         "title":  "Source",
+                                                         "value":  "Provider Exchange Network / Reynolds \u0026 Reynolds"
+                                                     },
+                                                     {
+                                                         "title":  "Platform",
+                                                         "value":  "EAS"
+                                                     },
+                                                     {
+                                                         "title":  "Reported",
+                                                         "value":  "Uzair Mumtaz (PEN), 09/23/26"
+                                                     }
+                                                 ]
+                                   },
+                                   {
+                                       "type":  "TextBlock",
+                                       "text":  "Root cause",
+                                       "wrap":  true,
+                                       "weight":  "Bolder",
+                                       "spacing":  "Medium",
+                                       "size":  "Small"
+                                   },
+                                   {
+                                       "type":  "TextBlock",
+                                       "text":  "Onboarding load for dealer 63237 (AU423D75, live 2026-09-21) created DEALER_PRODUCT_CODE rows for all 21 program-20285 products but applied rate systems (V_Rate_System_Application) to only 19; AUGP (AU PP GAP) and AUPL (AU PP GAP Plus) have none, so GAP is silently dropped from the 200 SUCCESS response. Only exclusion on AUGP/AUPL in Program_Product_Eligibility is DEMO, so a New/FINANCE deal is eligible. Other WA Audi dealers use AUGP WA / AUPL WA (5 dealers each); both have 24 active RATE_SKU_VCI rows on 2026-09-23, terms 12-96.\n\nQPTR/QPTS: V_PROGRAM_VEHICLE_CLASS carries Make AUDI / Model ALL MODELS / EXCLUDED, eff 2020-01-22 to 9999-12-31. QPVS: every Audi class row is expired; only exclusions remain. QualityProtect is the competitive-make sibling of the VCI line; Audi vehicles are served by AUTR/AUTS/AUVS, which returned. Matches pattern library #23 (partial rate-system sync on onboarding).",
+                                       "wrap":  true,
+                                       "size":  "Small",
+                                       "spacing":  "None"
+                                   },
+                                   {
+                                       "type":  "TextBlock",
+                                       "text":  "How this was verified",
+                                       "wrap":  true,
+                                       "weight":  "Bolder",
+                                       "spacing":  "Medium",
+                                       "size":  "Small"
+                                   },
+                                   {
+                                       "type":  "TextBlock",
+                                       "text":  "1. GAP rate systems missing - V_Rate_System_Application for Dealer_Number AU423D75 (live EAS, 9/30) returned 19 products; AUGP and AUPL absent.\n2. GAP assigned - live DEALER_PRODUCT_CODE for dealer_id 63237 shows AUGP and AUPL open 2026-09-21 to 9999-12-31.\n3. GAP would price - STAGING.EAS.RATE_SKU_VCI: AUGP WA and AUPL WA each 24 rows active on 2026-09-23, terms 12-96.\n4. WA rate system choice - V_Rate_System_Application program 20285: AUGP WA and AUPL WA each applied to 5 WA dealers.\n5. QP Term excluded - V_PROGRAM_VEHICLE_CLASS QPTR and QPTS: AUDI / ALL MODELS / EXCLUDED, 2020-01-22 to 9999-12-31.\n6. QP VSC no class - V_PROGRAM_VEHICLE_CLASS QPVS Audi rows: all non-exclusion classes expired (latest 2017-01-25).\n7. Payload - 2043636327_provider_combined.txt: single 200 SUCCESS call returning AUMD, QPAP, AUDD, AUTW, AUTH, AUTR, AUTS, AUVS, AUWD, AUKY.\n8. No duplicate - Snowflake contract probe over SG_CON_M1, ECON_CONTRACT and API_CONTRACT_SKU returned 0 rows for the VIN.",
+                                       "wrap":  true,
+                                       "isSubtle":  true,
+                                       "spacing":  "None",
+                                       "size":  "Small"
+                                   },
+                                   {
+                                       "type":  "TextBlock",
+                                       "text":  "Classification \u0026 routing",
+                                       "wrap":  true,
+                                       "weight":  "Bolder",
+                                       "spacing":  "Medium",
+                                       "size":  "Small"
+                                   },
+                                   {
+                                       "type":  "FactSet",
+                                       "spacing":  "None",
+                                       "facts":  [
+                                                     {
+                                                         "title":  "I",
+                                                         "value":  "ntegration Partner:** Reynolds and Reynolds"
+                                                     },
+                                                     {
+                                                         "title":  "A",
+                                                         "value":  "ggregator:** Provider Exchange Network"
+                                                     },
+                                                     {
+                                                         "title":  "I",
+                                                         "value":  "nquiry Type:** Rating"
+                                                     },
+                                                     {
+                                                         "title":  "I",
+                                                         "value":  "nquiry Sub-Type:** EAS"
+                                                     },
+                                                     {
+                                                         "title":  "S",
+                                                         "value":  "R Category:** Rating - EAS, Coverage Missing"
+                                                     }
+                                                 ]
+                                   }
+                               ]
+                 },
+                 {
+                     "type":  "TextBlock",
+                     "text":  "❌ Setup issue found · Read-only pre-analysis, confirm with the owning team before acting · Emory",
+                     "wrap":  true,
+                     "size":  "Small",
+                     "separator":  true,
+                     "isSubtle":  true
+                 }
+             ]
+}

@@ -1,4 +1,54 @@
-# Emory Analysis Guardrails — Lessons from INC1315776
+# Emory Analysis Guardrails
+---
+
+## 0. PRE-POST VERIFICATION GATE — read before any `-Post` (added 2026-09-15, INC1320603)
+
+**The failure this prevents.** A card was posted to #api-support-intake stating that
+"9 further dealers carry the same broken config and should be checked." **That number was never
+verified.** It came from a cohort query that filtered a **literal date value**
+(`Expiration_Sales_Date = '2026-07-23'`), which both *missed* affected dealers (terminated on other
+dates) and *included* healthy ones (already re-enrolled). The verdict was correct; the **scope was
+wrong**, and it reached a team channel as fact. The real set was 5, not 10. Re-posting a correction
+does not undo people having read the first one.
+
+**The rule.** Every factual claim on a card — **especially counts, scope claims
+("N other dealers/VINs affected"), and any assertion of a mechanism** — must trace to a query
+**actually run**, whose logic you checked. **Inference is not verification.** If you did not run it,
+it does not go on the card.
+
+**The gate.** `emory_post.ps1` now **refuses to post** unless the verdict JSON carries a
+`verification` array — one entry per load-bearing claim, naming the claim and how it was
+established. Entries under 25 characters are rejected ("checked" is not evidence). Dry runs are
+never gated, so drafting stays frictionless. The gate cannot check a claim is *true* — only that
+you enumerated it against evidence before delivery, which is precisely the step that was skipped.
+
+```json
+"verification": [
+  "Scope = 5 dealers - ran the has_open=0 AND has_inverted=1 aggregation over all program-20378
+   dealers on rate system 4639; result was exactly HPPFL062, 073, 109, 118, 150.",
+  "RETRACTED from the prior card: the '9 further dealers' claim - traced to a literal-date
+   cohort query that was never validated."
+]
+```
+
+**Three specific habits this encodes:**
+
+1. **Never filter a cohort on a literal value** you happened to observe in one row (a date, a
+   class code, a status). Express the *condition* instead (`Expiration < Effective`), then verify
+   the query returns the row you already know about **plus** nothing obviously healthy.
+2. **A refutation can itself be incomplete.** Here the hypothesis looked disproven because the
+   dealer held 67 contracts for the product. The resolution was that the *comparison* dealers had a
+   **second, open row** the reported dealer lacked. **Check for additional rows before accepting OR
+   rejecting** a finding.
+3. **Prefer a natural experiment to timeline correlation.** "Contracts stop the day before the
+   sync" at one dealer is suggestive. "This dealer sold zero while broken, then sold two days after
+   a replacement row appeared, and four unreplaced dealers have sold none ever" is proof. Go find
+   the second kind before posting.
+
+**Carry retractions forward explicitly.** When a corrected card supersedes an earlier one, state
+what was withdrawn in the card body — do not silently drop it and re-post a cleaner version.
+
+ — Lessons from INC1315776
 
 **Purpose:** Prevent the 6 critical mistakes that led to an incomplete verdict on INC1315776.
 
@@ -18,6 +68,7 @@
 | **GM***, **CB*** | GM | `RATE_SKU_GM` | Snowflake RR_UTILITY (Tier 1) | RoadRunner replica |
 | **HCI***, **PPES** | HCI 2.0 / Kia PPES | `RATE_SKU_HCI2O` | **LIVE EAS DB (Tier 2)** | ✅ LIVE DB — not replicated |
 | **QS*** | QualityShield (competitive brand) | Varies (check product master) | Varies | ✅ VERIFY — not all QS products replicated |
+| **SG Agents program 20376** (`SAFE`, `GAPE`, `RVGP`, `BTGP`, `AG**`, `SVSC`, `SLSE`…) | SGI Agents channel | `dbo.Rate_sku_SG_Agents` (2.87M rows) | **LIVE EAS DB (Tier 2)** | ✅ **NOT replicated to Snowflake AT ALL** — the table does not exist in `STAGING.EAS`. Sweeping every replicated `RATE_SKU_*` returns 0 and looks like "no rates loaded." GAP bands here are keyed on **`amount_finance_from`/`amount_financed_to`**, not MSRP. |
 
 **Protocol:**
 1. Extract product code (e.g., POTW → PO prefix)
@@ -234,6 +285,27 @@ Duplicate check:
 
 ---
 
+## 7. Source-of-Truth Rules (added 2026-10-01 — data audit)
+
+These came from a full read of all three platforms on 2026-10-01. Each one fixed a way Emory could
+give a confident wrong answer.
+
+| Rule | Why (evidence) |
+|---|---|
+| Route by **live product enrolment** (router R1), never by prefix | Codes are multi-written (EAS∩Legacy 45.7k dealers); HCI 1.0 (RR) and HCI 2.0 (EAS) share dealer prefixes but not product codes |
+| RoadRunner = **`STAGING.RR_UTILITY`** only | `STAGING.RR` last synced 2024-08-13: 331,882 vs 457,750 dealer-product rows; ~700 GMF dealers missing |
+| EAS dealer presence = **`V_DEALER`**, not `DEALER_PRODUCT_VW` | The view only lists dealers *with* products, so 0-product onboarding shells (e.g. `HPPNM027`) looked absent |
+| VIN decode on SQL Server = **exact squished pattern** `LEFT(vin,8)+SUBSTRING(vin,10,2)` (or `,10,1` for 9-char powersports) | `'{vin}' LIKE vin_pattern+'%'` returned **0 rows** for a valid VIN — the pattern omits check digit 9 |
+| Never gate on `RATE_SYSTEM_APPLICATION` sale dates | ~35% are stale stubs → false "Rate System Missing" (FDP_SYNC `has_open = 0` is the only exception) |
+| EAS rates live in **two** places | RATE_SKU_<program> **or** PRODUCT_PLAN_SKU_PRICE_HEADER; Mazda (637 dealers) has no RATE_SKU table at all |
+| Call-log evidence = SQL Server `dbo.BI_V_Ws_Call_log` | Snowflake copy is a single day (2026-05-11) |
+| Legacy product = `SG_RSC_PLC` on the rate schedule | `SG_DRS_PLC` is the enrolment plan and `SG_DLR_PLC` a default; matching either reports the wrong product |
+| Snowflake EAS is nightly | "Set up today" → re-run the EAS half live on SQL Server before saying "not configured" |
+
+**Known open data gaps** (state them in a verdict when the case touches them): see `references/routing.md` §4 (G1–G7).
+
+---
+
 ## Enforcement Checklist (Before Verdict)
 
 Before finalizing the verdict, verify:
@@ -245,6 +317,10 @@ Before finalizing the verdict, verify:
 - [ ] **Eligibility matrix read** (not guessed)
 - [ ] **Duplicate contracts classified** (status interpreted, not assumed)
 - [ ] **All "before concluding" checkpoints passed** (verified, not guessed)
+- [ ] **Routing came from the router (R1), not the dealer-code prefix** — the platform named in the verdict is the one where the product is *active today* (`references/routing.md`)
+- [ ] **No read from `STAGING.RR.*`** (frozen 2024-08-13) — RoadRunner evidence is `RR_UTILITY` only
+- [ ] **Rate path matches the program** — RATE_SKU table vs PRICE_HEADER per `routing.md` §2; SG Agents / Lithia / QualityGuard rates read on SQL Server
+- [ ] **Every number in the verdict came from a query run in this case** (no counts carried over from memory or this file without re-running)
 
 **If ANY of these are unchecked:** Mark verdict as **NEEDS REVIEW** and state what needs verification.
 

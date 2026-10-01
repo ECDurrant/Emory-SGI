@@ -1,5 +1,5 @@
 {
-  "_comment": "Canonical sample verdict used ONLY to regenerate emory_verdict_card.html. Kept as the INC1315934 RV GAP case so the reference card keeps demonstrating the orange NEEDS REVIEW styling. Exercises every optional field (title, source, reported, confirm). Regenerate with: powershell -File emory_post.ps1 -VerdictJson emory_verdict_card.sample.json -EmitTemplate",
+  "_comment": "Canonical sample verdict used ONLY to regenerate emory_verdict_card.html / .adaptive.json. Kept as the INC1315934 RV GAP case (NEEDS REVIEW) so the reference card shows the amber styling. Exercises the 2026-09-22 executive-summary fields (summary, key_question, question_for) PLUS every legacy field so fallbacks keep rendering; status table here is PARSED from checks_md (see sample2 for status_rows). Regenerate with: powershell -File emory_post.ps1 -VerdictJson emory_verdict_card.sample.json -EmitTemplate",
   "sr": "INC1315934",
   "title": "Outlet Recreation-Fargo — RV GAP pricing lower than expected",
   "dealer": "Outlet Recreation-Fargo (00S25531)",
@@ -11,9 +11,33 @@
   "platform": "EAS (SG Agents, program 20376)",
   "verdict": "NEEDS REVIEW",
   "verdict_color": "#f0883e",
+  "summary": [
+    "RV GAP and Marine GAP are priced differently on purpose: Marine sits at $250, RV runs $170 to $210 by term.",
+    "The roughly $220 the dealer remembers is an older price; carrier pricing is refreshed periodically.",
+    "Nothing is broken and the dealer can sell normally; the concern is confidence, not money."
+  ],
+  "key_question": "Is $170 the intended current RV GAP price for this dealer?",
+  "question_for": "Rates & Forms",
   "checks_md": "✅ **PASS** — Dealer status: active (EAS id 58473)\n✅ **PASS** — Products assigned: BTGP & RVGP authorized (2026-05-04 – 9999-12-31)\n✅ **PASS** — eContract forms: SGRGP1201115, 24-state coverage\n✅ **PASS** — Rate system: assigned (RVGP NATL id 4487)\n⚠️ **REVIEW** — Rate SKUs: API-computed, no stored pricing in the EAS tables\n✅ **PASS** — Vehicle eligibility: trailer eligible, products returned",
   "bottom": "The $170 the dealer saw is the real, current price the pricing engine returns for RV GAP — not an error. RV GAP and the Marine GAP product are simply priced differently on purpose: Marine sits at $250, while RV runs $170 to $210 depending on the length of the contract. The roughly $220 the dealer remembers is an older price from several months ago; carrier pricing is refreshed periodically, and this looks like a normal refresh rather than anything broken.",
   "confirm": "Rates & Forms should confirm that $170 is the intended current RV GAP price, so Account Management can tell the dealer with confidence that nothing is wrong. Because this product's price is calculated live rather than stored, we cannot verify it from our own records alone.",
-  "owner": "Rates & Forms (confirm current RVGP pricing); Account Management (dealer education)",
-  "classification": "**Integration Partner:** MenuMetric\n**Aggregator:** Provider Exchange Network (PEN) / F&I Express\n**Inquiry Type:** Pricing Query / Rate Verification\n**Inquiry Sub-Type:** Dealer Cost Discrepancy\n**SR Category:** Pricing - EAS"
+  "owner": "Rates & Forms; Account Management for the dealer conversation",
+  "classification": "**Integration Partner:** MenuMetric\n**Aggregator:** Provider Exchange Network (PEN) / F&I Express\n**Inquiry Type:** Pricing Query / Rate Verification\n**Inquiry Sub-Type:** Dealer Cost Discrepancy\n**SR Category:** Pricing - EAS",
+  "issue_line": "RV GAP is quoting $170 at Outlet Recreation-Fargo, below the expected $220-$250.",
+  "impact_line": "No customer or dealer loss - the quoted price is the correct current price.",
+  "action_line": "Rates & Forms to confirm $170 is the intended RV GAP price so Account Management can reassure the dealer.",
+  "business_impact": "No financial impact and nothing is broken. The dealer is quoting the correct current price and can sell normally.\n\nThe concern is confidence rather than money: the dealer believes the price is wrong, so Account Management needs a definitive answer before the dealer stops offering the product.",
+  "actions": [
+    "**Rates & Forms to confirm** that $170 is the intended current RV GAP price. This product's price is calculated live rather than stored, so it cannot be verified from our own records alone.",
+    "**Account Management to reassure the dealer** once confirmed, explaining that RV and Marine GAP are deliberately priced differently and that carrier pricing is refreshed periodically."
+  ],
+  "verification": [
+    "Dealer active - dbo.V_DEALER confirms EAS id 58473 with no end or out-of-business date.",
+    "Products authorised - BTGP and RVGP both assigned for the sale date window 2026-05-04 to 9999-12-31.",
+    "Form coverage - SGRGP1201115 present across 24 state mappings.",
+    "Rate system assigned - RVGP NATL (id 4487) applied to this dealer for this product.",
+    "Pricing is API-computed - no stored SKU rows exist in the EAS rate tables, so the $170 could not be confirmed from config; this is why Rates & Forms confirmation is requested rather than asserted.",
+    "Vehicle eligible - trailer classed and products returned in the response."
+  ],
+  "pattern": "Pricing verification"
 }
