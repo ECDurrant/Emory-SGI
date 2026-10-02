@@ -17,6 +17,16 @@ powershell -ExecutionPolicy Bypass -File ~/.claude/skills/emory/verify_emory.ps1
 
 ---
 
+## What changed in 2026-10-02 (end-of-day review)
+
+- **Review log:** every Emory run (posted or not) appends to `Downloads\emory_review_log.csv` — from
+  `emory_post.ps1` (all runs, incl. dry runs) and from the MCP tools (`review_log.py`).
+- **`emory_daily_review.ps1`** + **`Register-EmoryDailyReviewTask.ps1`**: weekday 17:30 end-of-day review of every
+  case, merged with the card log; saved to `Downloads\Emory_Daily_Reviews\`; posted only while autopost is on.
+  Task registered on Ed's machine 2026-10-02. Morning digest unchanged.
+
+---
+
 ## What changed in 2026-10-01 (data audit — routing, RoadRunner, Legacy)
 
 Card layout untouched (still the locked 2026-09-22 baseline). Query/data layer only:

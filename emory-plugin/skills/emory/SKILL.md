@@ -784,6 +784,16 @@ by whitespace only; small grey uppercase labels, status dots, one accent (the ve
 Teams client) and Cascadia Mono for IDs; web fonts cannot be loaded into a Teams message. Body copy
 14px near-white, nothing under 12.5px.
 
+**Every case goes into the end-of-day review (2026-10-02).** Each Emory run writes one row to
+`Downloads\emory_review_log.csv` (or `$env:EMORY_REVIEW_LOG`), **posted or not**: `emory_post.ps1` logs on
+every run, dry runs included, and the MCP tools (`emory_check_case`, `emory_investigate`, `emory_post_verdict`)
+log themselves. So **end every case by running `emory_post.ps1`** (dry run or `-Auto`), and pass `sr=` to
+`emory_check_case` so the case is filed under its ticket. `emory_daily_review.ps1` builds the end-of-day
+review (counts, platforms, owners, recurring patterns, known gaps hit, reviewed-but-not-posted) at 17:30
+on weekdays (task "Emory End-of-Day Review", `Register-EmoryDailyReviewTask.ps1`): always saved to
+`Downloads\Emory_Daily_Reviews\<date>.html/.md`, posted to the channel only while `emory_autopost.txt` = on.
+For one team-wide picture, point `EMORY_REVIEW_LOG` at a shared OneDrive/SharePoint-synced file.
+
 **Daily digest:** `emory_digest.ps1` posts a weekday-morning channel summary (yesterday's cards, questions
 waiting on an owner, key metrics, 14-day trend) from the local delivery log the poster writes. It is a
 separate post — never add counts or timelines to the verdict card. Details in

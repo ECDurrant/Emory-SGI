@@ -773,6 +773,27 @@ Write-Host $message
 Write-Host "------------------------------------------------------------------"
 Write-Host "(payload also carries 'card': an Adaptive Card with collapsible details, $($cardJson.Length) chars; used once the flow has a Post-card step)" -ForegroundColor DarkGray
 
+# ---- Review log (every case Emory reviews, posted or not) ----------------------------------
+# One row per run -> Downloads\emory_review_log.csv (or $env:EMORY_REVIEW_LOG, e.g. a shared
+# OneDrive folder for a team-wide picture). emory_daily_review.ps1 builds the end-of-day review
+# from it, so a case shows up even when its card is never posted. Never fails the run.
+function Write-ReviewLog([string]$posted) {
+  try {
+    $rl = if ($env:EMORY_REVIEW_LOG) { $env:EMORY_REVIEW_LOG } else { Join-Path (Split-Path -Parent $UrlFile) 'emory_review_log.csv' }
+    $rhdr = 'reviewed,sr,dealer,product,vin,platform,verdict,owner,pattern,first_issue,summary,posted,source,reviewer'
+    if (-not (Test-Path -LiteralPath $rl) -or ((Get-Item -LiteralPath $rl).Length -eq 0)) {
+      Set-Content -LiteralPath $rl -Value $rhdr -Encoding UTF8
+    }
+    function RQ([string]$x) { $t = ("$x" -replace '"','""' -replace "`r?`n",' '); if ($t.Length -gt 500) { $t = $t.Substring(0,500) }; return '"' + $t + '"' }
+    $sum = if ($v.action_line) { [string]$v.action_line } elseif ($v.bottom) { [string]$v.bottom } else { '' }
+    $iss = if ($v.issue_line) { [string]$v.issue_line } elseif ($v.issue) { [string]$v.issue } else { '' }
+    $row = @((Get-Date).ToString('yyyy-MM-dd HH:mm'), $v.sr, $v.dealer, $v.product, $v.vin, $v.platform, $v.verdict,
+             $owner, $v.pattern, $iss, $sum, $posted, 'emory_post', $env:USERNAME | ForEach-Object { RQ $_ }) -join ','
+    Add-Content -LiteralPath $rl -Value $row -Encoding UTF8
+  } catch { Write-Host "(review log not written: $($_.Exception.Message))" -ForegroundColor DarkGray }
+}
+
+if (-not $doPost) { Write-ReviewLog 'no' }
 if (-not $doPost) {
   if ($Auto) { Write-Host "AUTO-POST OFF (toggle '$AutoFile' is not on) - dry run, not posted." -ForegroundColor Yellow }
   else { Write-Host "DRY RUN - not posted. Re-run with -Post (or -Auto when hands-off is on) to deliver." -ForegroundColor Yellow }
@@ -787,6 +808,7 @@ if (-not $url) { throw "No https URL found in $UrlFile" }
 $bytes = [System.Text.Encoding]::UTF8.GetBytes($payload)
 $resp = Invoke-WebRequest -Uri $url -Method Post -ContentType 'application/json; charset=utf-8' -Body $bytes -UseBasicParsing
 Write-Host "Posted to #api-support-intake. HTTP $($resp.StatusCode)" -ForegroundColor Green
+Write-ReviewLog 'yes'
 # Delivery log (local, never shared): one line per real post, drives the "card N today" footer.
 # Schema (CSV, header written on first use, older files upgraded in place):
 #   posted,sr,title,verdict,owner,platform,question_for,key_question,reported_date,dealer,category,inquiry_type,pattern
